@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security Architecture · permit0</title>
+<meta name="description" content="Permit0's security architecture — pre-execution gate, capability tokens, kill switch, deployment-mode boundaries, threat model.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;450;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230a1628'/%3E%3Cpath d='M 24 14 L 14 14 L 14 50 L 24 50 M 40 14 L 50 14 L 50 50 L 40 50' stroke='%2322d3ee' stroke-width='9' fill='none'/%3E%3Ccircle cx='32' cy='32' r='6' fill='%2322d3ee'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --midnight:        #0a1628;
+    --midnight-2:      #0f1d33;
+    --midnight-3:      #16273f;
+    --cyan:            #22d3ee;
+    --cyan-2:          #67e8f9;
+    --cyan-deep:       #0e93b0;
+    --bg-light:        #f6f4ee;
+    --bg-card:         #ffffff;
+    --bg-card-2:       #fbf9f3;
+    --border-light:    #e5e1d3;
+    --border-light-2:  #d4cfbe;
+    --border-dark:     #1a2c47;
+    --border-dark-2:   #243a5c;
+    --text-dark:       #0a1628;
+    --text-mute:       #4d5868;
+    --text-mute-2:     #76808f;
+    --text-light:      #ffffff;
+    --text-light-mute: #a7b2c4;
+    --text-light-dim:  #6c7689;
+    --warn:            #f59e0b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--text-dark);
+    background: var(--bg-light);
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  h1, h2, h3 { font-family: 'Inter', sans-serif; font-weight: 600; letter-spacing: -0.025em; }
+  h1 { font-size: clamp(36px, 5vw, 56px); line-height: 1.05; letter-spacing: -0.035em; }
+  h2 { font-size: 26px; line-height: 1.2; letter-spacing: -0.02em; }
+  h3 { font-size: 18px; line-height: 1.3; }
+  p { color: var(--text-mute); }
+  a { color: inherit; text-decoration: none; }
+  .container { max-width: 880px; margin: 0 auto; padding: 0 32px; }
+  .container-wide { max-width: 1240px; margin: 0 auto; padding: 0 32px; }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 22px; border-radius: 6px;
+    font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500;
+    transition: all 0.15s ease; cursor: pointer; border: 1px solid transparent;
+    line-height: 1; white-space: nowrap;
+  }
+  .btn-primary { background: var(--cyan); color: var(--midnight); border-color: var(--cyan); }
+  .btn-primary:hover { background: var(--cyan-2); border-color: var(--cyan-2); transform: translateY(-1px); }
+  .btn-ghost-light { background: transparent; color: var(--text-dark); border-color: var(--border-light-2); }
+  .btn-ghost-light:hover { border-color: var(--midnight); }
+  .btn-dark { background: var(--midnight); color: var(--text-light); border-color: var(--midnight); }
+  .btn-dark:hover { background: var(--midnight-3); border-color: var(--midnight-3); }
+  .btn-sm { padding: 8px 14px; font-size: 13px; }
+  .btn-lg { padding: 14px 26px; font-size: 15px; }
+  .arrow { transition: transform 0.2s ease; display: inline-block; }
+  .btn:hover .arrow, a:hover .arrow { transform: translateX(3px); }
+  .link-cyan {
+    color: var(--cyan-deep); font-weight: 500; font-size: 14px;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .link-cyan:hover { color: var(--midnight); }
+
+  /* Logo */
+  .logo-mark { display: inline-block; width: 28px; height: 28px; flex-shrink: 0; }
+  .logo-mark svg { width: 100%; height: 100%; display: block; }
+  .wordmark {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: 'Inter', sans-serif; font-weight: 500; font-size: 21px;
+    letter-spacing: -0.04em; color: var(--midnight);
+  }
+
+  /* Promo */
+  .promo {
+    background: var(--midnight); color: var(--text-light);
+    padding: 11px 24px; text-align: center; font-size: 13.5px;
+    border-bottom: 1px solid var(--border-dark);
+    position: relative; z-index: 110;
+  }
+  .promo .pill {
+    display: inline-block; padding: 2px 8px;
+    background: var(--cyan); color: var(--midnight); border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.1em; margin-right: 12px; vertical-align: 1.5px;
+  }
+  .promo a { color: var(--cyan); margin-left: 6px; font-weight: 500; }
+  .promo a:hover { color: var(--cyan-2); }
+
+  /* Nav */
+  nav.main {
+    position: sticky; top: 0;
+    background: rgba(246, 244, 238, 0.85);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border-light);
+    z-index: 100;
+  }
+  .nav-inner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 32px; max-width: 1240px; margin: 0 auto;
+  }
+  .nav-left { display: flex; align-items: center; gap: 56px; }
+  .nav-links { display: flex; align-items: center; gap: 32px; }
+  .nav-links a {
+    font-size: 14px; font-weight: 450; color: var(--text-mute);
+    transition: color 0.15s; display: inline-flex; align-items: center; gap: 4px;
+  }
+  .nav-links a:hover { color: var(--midnight); }
+  .nav-links a.current { color: var(--midnight); font-weight: 500; }
+
+  /* Hero */
+  .page-hero { padding: 64px 0 48px; }
+  .breadcrumb {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px;
+    color: var(--text-mute-2); letter-spacing: 0.04em;
+    margin-bottom: 28px;
+  }
+  .breadcrumb a { color: var(--text-mute-2); }
+  .breadcrumb a:hover { color: var(--midnight); }
+  .breadcrumb .sep { opacity: 0.5; }
+  .breadcrumb .current { color: var(--midnight); }
+
+  .preview-pill {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 6px 14px;
+    background: rgba(245, 158, 11, 0.10);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-radius: 100px;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase;
+    color: #b45309;
+    margin-bottom: 24px;
+  }
+  .preview-pill .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--warn);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5);
+    animation: pulse 2.4s infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+    70%  { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0); }
+  }
+
+  .page-hero h1 { margin-bottom: 20px; }
+  .page-hero .lede {
+    font-size: 19px;
+    line-height: 1.5;
+    color: var(--text-mute);
+    max-width: 60ch;
+  }
+
+  /* Sections */
+  .stub-section {
+    padding: 56px 0;
+    border-top: 1px solid var(--border-light);
+  }
+  .stub-section h2 { margin-bottom: 14px; }
+  .stub-section .section-sub {
+    color: var(--text-mute);
+    margin-bottom: 28px;
+    font-size: 16px;
+    max-width: 60ch;
+  }
+
+  /* Outline list */
+  .outline {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .outline-item {
+    display: flex; gap: 22px; align-items: flex-start;
+    padding: 22px 28px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .outline-item:last-child { border-bottom: none; }
+  .outline-item .num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--cyan-deep);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+    padding-top: 4px;
+    width: 28px;
+  }
+  .outline-item .body h3 { font-size: 17px; margin-bottom: 6px; color: var(--midnight); }
+  .outline-item .body p { font-size: 14.5px; line-height: 1.55; color: var(--text-mute); margin: 0; }
+
+  /* CTA cards (founders + email) */
+  .cta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 8px;
+  }
+  .cta-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 28px;
+  }
+  .cta-card.dark {
+    background: var(--midnight);
+    color: var(--text-light);
+    border-color: var(--midnight);
+  }
+  .cta-card .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--cyan-deep);
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .cta-card.dark .label { color: var(--cyan); }
+  .cta-card h3 {
+    font-size: 19px;
+    color: var(--midnight);
+    margin-bottom: 8px;
+    line-height: 1.3;
+  }
+  .cta-card.dark h3 { color: var(--text-light); }
+  .cta-card p {
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--text-mute);
+    margin-bottom: 18px;
+  }
+  .cta-card.dark p { color: var(--text-light-mute); }
+  .cta-card .footnote {
+    font-size: 12px;
+    color: var(--text-mute-2);
+    margin-top: 10px;
+    margin-bottom: 0;
+  }
+  .cta-card.dark .footnote { color: var(--text-light-dim); }
+
+  /* Email form */
+  .email-form {
+    display: flex;
+    gap: 8px;
+  }
+  .email-form input {
+    flex: 1;
+    padding: 11px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border-light-2);
+    background: var(--bg-card);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    color: var(--midnight);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .email-form input:focus { border-color: var(--cyan); }
+  .email-form input::placeholder { color: var(--text-mute-2); }
+
+  /* While you're here */
+  .while-here {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .while-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 8px;
+    padding: 22px;
+    transition: all 0.15s ease;
+  }
+  .while-card:hover {
+    border-color: var(--midnight);
+    transform: translateY(-2px);
+  }
+  .while-card .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--cyan-deep);
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .while-card.published .tag { color: #15803d; }
+  .while-card.published .tag::before { content: '✓ '; }
+  .while-card h3 {
+    font-size: 16px;
+    color: var(--midnight);
+    margin-bottom: 6px;
+    line-height: 1.3;
+  }
+  .while-card p {
+    font-size: 13px;
+    color: var(--text-mute);
+    line-height: 1.5;
+    margin-bottom: 12px;
+  }
+  .while-card .arrow-link {
+    font-size: 13px;
+    color: var(--midnight);
+    font-weight: 500;
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  /* Footer */
+  footer {
+    background: var(--midnight);
+    color: var(--text-light-mute);
+    border-top: 1px solid var(--border-dark);
+    padding: 56px 32px 36px;
+    margin-top: 80px;
+  }
+  .footer-inner {
+    max-width: 1240px; margin: 0 auto;
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 24px;
+  }
+  .footer-inner .wordmark { color: var(--text-light); font-size: 18px; }
+  .footer-meta {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-light-dim);
+    letter-spacing: 0.04em;
+  }
+  .footer-links { display: flex; gap: 18px; }
+  .footer-links a {
+    font-size: 13px; color: var(--text-light-mute); transition: color 0.15s;
+  }
+  .footer-links a:hover { color: var(--cyan); }
+
+  /* Responsive */
+  @media (max-width: 760px) {
+    .nav-links a:not(.current) { display: none; }
+    .cta-grid { grid-template-columns: 1fr; }
+    .while-here { grid-template-columns: 1fr; }
+    .container, .container-wide { padding: 0 20px; }
+    .footer-inner { flex-direction: column; align-items: flex-start; }
+    .email-form { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Promo -->
+<div class="promo">
+  <span class="pill">BETA</span>
+  Design partner program — fintech, insurtech, healthtech teams shipping AI agents into production.
+  <a href="/#design-partner">Apply &rarr;</a>
+</div>
+
+<!-- Nav -->
+<nav class="main">
+  <div class="nav-inner">
+    <div class="nav-left">
+      <a href="/" class="wordmark">
+        <span class="logo-mark">
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 24 14 L 14 14 L 14 50 L 24 50 M 40 14 L 50 14 L 50 50 L 40 50"
+                  stroke="#22d3ee" stroke-width="9" fill="none"
+                  stroke-linecap="square" stroke-linejoin="miter"/>
+            <circle cx="32" cy="32" r="6" fill="#22d3ee"/>
+          </svg>
+        </span>
+        permit0
+      </a>
+      <div class="nav-links">
+        <a href="/#platform">Product</a>
+        <a href="/#verticals">Solutions</a>
+        <a href="/taxonomy/">Taxonomy</a>
+        <a href="/#resources">Resources</a>
+      </div>
+    </div>
+    <div>
+      <a href="/#design-partner" class="btn btn-dark btn-sm">Talk to founders</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="page-hero">
+  <div class="container">
+    <div class="breadcrumb">
+      <a href="/">Home</a>
+      <span class="sep">/</span>
+      <a href="/#platform">Product</a>
+      <span class="sep">/</span>
+      <span class="current">Security Architecture</span>
+    </div>
+
+    <div class="preview-pill">
+      <span class="dot"></span>
+      Preview · Draft in progress
+    </div>
+
+    <h1>Security Architecture</h1>
+    <p class="lede">The full document is in active development. Here's what it will cover when published — and how to get the working draft today.</p>
+  </div>
+</section>
+
+<!-- Outline -->
+<section class="stub-section">
+  <div class="container">
+    <h2>What this document will cover</h2>
+    <p class="section-sub">A complete, threat-modeled security architecture for Permit0's pre-execution policy enforcement.</p>
+
+    <div class="outline">
+      <div class="outline-item">
+        <div class="num">01</div>
+        <div class="body">
+          <h3>Permit0's security model</h3>
+          <p>What we defend against, what we explicitly don't, and the trust boundaries between agent, gate, and execution. The honest list of in-scope and out-of-scope threats — written for engineers and review boards, not marketing.</p>
+        </div>
+      </div>
+      <div class="outline-item">
+        <div class="num">02</div>
+        <div class="body">
+          <h3>Pre-execution gate architecture</h3>
+          <p>How the <span class="mono" style="color:var(--midnight); font-weight:500;">@guard</span> decorator intercepts agent tool calls, how the policy engine evaluates them, and how decisions return a signed capability token before execution proceeds.</p>
+        </div>
+      </div>
+      <div class="outline-item">
+        <div class="num">03</div>
+        <div class="body">
+          <h3>Capability token design</h3>
+          <p>Token format (PASETO v4.public), payload binding to argument hashes, constraint envelopes, TTL, replay protection, and the verification path inside the Execution Gateway. Why an adversarial prompt cannot bypass a signed gate.</p>
+        </div>
+      </div>
+      <div class="outline-item">
+        <div class="num">04</div>
+        <div class="body">
+          <h3>Kill switch and break-glass mechanics</h3>
+          <p>Global override authority across deployment modes. How customer security teams suspend an agent fleet in seconds, what break-glass auditing produces, and how recovery proceeds without losing audit continuity.</p>
+        </div>
+      </div>
+      <div class="outline-item">
+        <div class="num">05</div>
+        <div class="body">
+          <h3>Deployment-mode security boundaries</h3>
+          <p>Cloud, managed VPC, and self-hosted modes — the exact data-residency, telemetry, and operator-access guarantees of each. Built for security review boards comparing architectures during procurement.</p>
+        </div>
+      </div>
+      <div class="outline-item">
+        <div class="num">06</div>
+        <div class="body">
+          <h3>Threat model</h3>
+          <p>What Permit0 mitigates: prompt injection, privilege escalation, irreversible mutation, cross-session attack chains, exfiltration via tool calls. What's out of scope: model-internal reasoning attacks, host-OS compromise, network-layer attacks. STRIDE-categorized with explicit assumptions.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTAs: Founders + Email -->
+<section class="stub-section">
+  <div class="container">
+    <h2>Need this before it's published?</h2>
+    <p class="section-sub">Two paths — pick whichever fits your timeline.</p>
+
+    <div class="cta-grid">
+      <div class="cta-card dark">
+        <div class="label">Path 1 · For high-intent readers</div>
+        <h3>Walk through the working draft with the founders.</h3>
+        <p>The founders are happy to share the WIP architecture document on a 30-minute call and answer security questions in real time. We've done dozens of these — they're substantive, not sales calls.</p>
+        <a href="mailto:founders@permit0.com?subject=Security%20architecture%20review" class="btn btn-primary">Talk to founders <span class="arrow">→</span></a>
+      </div>
+
+      <div class="cta-card">
+        <div class="label">Path 2 · I'd rather wait</div>
+        <h3>Notify me when published.</h3>
+        <p>One email when this document ships. No newsletter, no marketing cadence — just the link to the published doc.</p>
+        <form class="email-form" action="https://api.web3forms.com/submit" method="POST">
+          <input type="hidden" name="access_key" value="f662ec4c-482e-42f3-a63e-5459570616a1">
+          <input type="hidden" name="subject" value="[permit0] Notify request — Security Architecture">
+          <input type="hidden" name="from_name" value="permit0 site">
+          <input type="hidden" name="document_requested" value="Security Architecture">
+          <input type="hidden" name="page_url" value="https://permit0.com/product/security.html">
+          <input type="hidden" name="redirect" value="https://permit0.com/product/security.html?notified=1">
+          <input type="checkbox" name="botcheck" style="display:none" tabindex="-1" autocomplete="off">
+          <input type="email" name="email" placeholder="your@email.com" required>
+          <button type="submit" class="btn btn-dark">Notify me</button>
+        </form>
+        <p class="footnote">We'll only use your email to send this single notification.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <div class="footer-inner">
+    <a href="/" class="wordmark">
+      <span class="logo-mark">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <path d="M 24 14 L 14 14 L 14 50 L 24 50 M 40 14 L 50 14 L 50 50 L 40 50"
+                stroke="#22d3ee" stroke-width="9" fill="none"
+                stroke-linecap="square" stroke-linejoin="miter"/>
+          <circle cx="32" cy="32" r="6" fill="#22d3ee"/>
+        </svg>
+      </span>
+      permit0
+    </a>
+    <div class="footer-meta">permit0 · ©2026 · Seattle / Oxford</div>
+    <div class="footer-links">
+      <a href="https://github.com/permit0-ai">GitHub</a>
+      <a href="mailto:founders@permit0.com">Contact</a>
+      <a href="/">Home</a>
+    </div>
+  </div>
+</footer>
+
+
+<script>
+  // Show thanks message if redirected back after form submission
+  if (window.location.search.includes('notified=1')) {
+    document.addEventListener('DOMContentLoaded', function() {
+      var form = document.querySelector('.email-form');
+      if (form) {
+        var thanks = document.createElement('div');
+        thanks.style.cssText = 'padding: 14px 18px; background: rgba(34, 211, 238, 0.08); border: 1px solid rgba(34, 211, 238, 0.35); border-radius: 6px; color: var(--midnight); font-size: 14px; font-weight: 500;';
+        thanks.innerHTML = '✓ Got it. We\'ll email you when this document is published.';
+        form.parentNode.replaceChild(thanks, form);
+      }
+    });
+  }
+</script>
+</body>
+</html>
