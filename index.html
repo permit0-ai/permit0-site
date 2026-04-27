@@ -1,0 +1,1957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>permit0 — Action authorization for AI agents</title>
+<meta name="description" content="Permit0 is the action authorization layer for AI agents — the deterministic policy enforcement between what an agent decides and what it executes.">
+<meta name="version" content="colorful">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;450;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230a1628'/%3E%3Cpath d='M 24 14 L 14 14 L 14 50 L 24 50 M 40 14 L 50 14 L 50 50 L 40 50' stroke='%2322d3ee' stroke-width='9' fill='none'/%3E%3Ccircle cx='32' cy='32' r='6' fill='%2322d3ee'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --midnight:        #0a1628;
+    --midnight-2:      #0f1d33;
+    --midnight-3:      #16273f;
+    --midnight-4:      #1c3050;
+    --cyan:            #22d3ee;
+    --cyan-2:          #67e8f9;
+    --cyan-deep:       #0e93b0;
+    --cyan-soft:       #cffafe;
+    --cyan-glow:       rgba(34, 211, 238, 0.18);
+
+    /* Multi-color secondary palette — used meaningfully (per role, per vertical, per framework) */
+    --violet:          #a78bfa;
+    --violet-deep:     #7c3aed;
+    --violet-soft:     #ede9fe;
+    --coral:           #fb7185;
+    --coral-deep:      #e11d48;
+    --coral-soft:      #ffe4e6;
+    --amber:           #fbbf24;
+    --amber-deep:      #d97706;
+    --amber-soft:      #fef3c7;
+    --lime:            #a3e635;
+    --lime-deep:       #65a30d;
+    --lime-soft:       #ecfccb;
+    --sky:             #60a5fa;
+    --sky-deep:        #2563eb;
+    --sky-soft:        #dbeafe;
+
+    --bg-light:        #f6f4ee;
+    --bg-card:         #ffffff;
+    --bg-card-2:       #fbf9f3;
+    --border-light:    #e5e1d3;
+    --border-light-2:  #d4cfbe;
+    --border-dark:     #1a2c47;
+    --border-dark-2:   #243a5c;
+    --text-dark:       #0a1628;
+    --text-mute:       #4d5868;
+    --text-mute-2:     #76808f;
+    --text-light:      #ffffff;
+    --text-light-mute: #a7b2c4;
+    --text-light-dim:  #6c7689;
+    --warn:            #f59e0b;
+    --block:           #ef4444;
+    --allow:           #22c55e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', -apple-system, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    color: var(--text-dark);
+    background: var(--bg-light);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
+
+  h1, h2, h3, h4, h5 {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    color: inherit;
+  }
+  h1 { font-size: clamp(40px, 6.4vw, 76px); line-height: 1.04; letter-spacing: -0.04em; font-weight: 600; }
+  h2 { font-size: clamp(30px, 3.8vw, 48px); line-height: 1.1; letter-spacing: -0.03em; }
+  h3 { font-size: 22px; line-height: 1.3; letter-spacing: -0.02em; }
+  h4 { font-size: 17px; line-height: 1.4; letter-spacing: -0.015em; font-weight: 600; }
+
+  p { color: var(--text-mute); max-width: 62ch; }
+  a { color: inherit; text-decoration: none; }
+
+  .container {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 0 32px;
+  }
+
+  /* Eyebrow */
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--cyan-deep);
+  }
+  .dark .eyebrow { color: var(--cyan); }
+  .eyebrow::before {
+    content: '';
+    width: 22px;
+    height: 1px;
+    background: var(--cyan-deep);
+  }
+  .dark .eyebrow::before { background: var(--cyan); }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 22px;
+    border-radius: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    transition: all 0.15s ease;
+    cursor: pointer;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    line-height: 1;
+  }
+  .btn-primary { background: var(--cyan); color: var(--midnight); border-color: var(--cyan); }
+  .btn-primary:hover { background: var(--cyan-2); border-color: var(--cyan-2); transform: translateY(-1px); }
+
+  .btn-ghost-dark { background: transparent; color: var(--text-light); border-color: rgba(255,255,255,0.22); }
+  .btn-ghost-dark:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  .btn-ghost-light { background: transparent; color: var(--text-dark); border-color: var(--border-light-2); }
+  .btn-ghost-light:hover { border-color: var(--midnight); }
+
+  .btn-dark { background: var(--midnight); color: var(--text-light); border-color: var(--midnight); }
+  .btn-dark:hover { background: var(--midnight-3); border-color: var(--midnight-3); transform: translateY(-1px); }
+
+  .btn-sm { padding: 8px 14px; font-size: 13px; }
+  .btn-lg { padding: 14px 26px; font-size: 15px; }
+
+  .arrow { transition: transform 0.2s ease; display: inline-block; }
+  .btn:hover .arrow, a:hover .arrow { transform: translateX(3px); }
+
+  .link-cyan {
+    color: var(--cyan-deep);
+    font-weight: 500;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dark .link-cyan { color: var(--cyan); }
+  .link-cyan:hover { color: var(--midnight); }
+  .dark .link-cyan:hover { color: var(--cyan-2); }
+
+  /* —————————————————————— LOGO ——————————————————————— */
+  .logo-mark {
+    display: inline-block;
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+  }
+  .logo-mark svg { width: 100%; height: 100%; display: block; }
+
+  .wordmark {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 21px;
+    letter-spacing: -0.04em;
+    color: var(--midnight);
+  }
+  .dark .wordmark { color: var(--text-light); }
+
+  /* —————————————————————— PROMO BANNER ——————————————————————— */
+  .promo {
+    background: var(--midnight);
+    color: var(--text-light);
+    padding: 11px 24px;
+    text-align: center;
+    font-size: 13.5px;
+    font-weight: 400;
+    border-bottom: 1px solid var(--border-dark);
+    position: relative;
+    z-index: 110;
+  }
+  .promo .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--cyan);
+    color: var(--midnight);
+    border-radius: 3px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    margin-right: 12px;
+    vertical-align: 1.5px;
+  }
+  .promo a {
+    color: var(--cyan);
+    margin-left: 6px;
+    font-weight: 500;
+  }
+  .promo a:hover { color: var(--cyan-2); }
+
+  /* —————————————————————— NAV ——————————————————————— */
+  nav.main {
+    position: sticky;
+    top: 0;
+    background: rgba(246, 244, 238, 0.85);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--border-light);
+    z-index: 100;
+  }
+  .nav-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    max-width: 1240px;
+    margin: 0 auto;
+  }
+  .nav-left { display: flex; align-items: center; gap: 56px; }
+  .nav-links { display: flex; align-items: center; gap: 32px; }
+  .nav-links a {
+    font-size: 14px;
+    font-weight: 450;
+    color: var(--text-mute);
+    transition: color 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .nav-links a:hover { color: var(--midnight); }
+  .nav-links a .chev {
+    font-size: 9px;
+    opacity: 0.5;
+    margin-top: 1px;
+  }
+  .nav-right { display: flex; align-items: center; gap: 12px; }
+  .nav-right a.signin {
+    font-size: 14px;
+    color: var(--text-mute);
+    font-weight: 450;
+  }
+  .nav-right a.signin:hover { color: var(--midnight); }
+
+  /* —————————————————————— HERO ——————————————————————— */
+  section.hero {
+    background: var(--midnight);
+    color: var(--text-light);
+    position: relative;
+    overflow: hidden;
+    padding: 100px 0 90px;
+  }
+  section.hero::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 50% at 25% -10%, rgba(167,139,250,0.18), transparent 55%),
+      radial-gradient(ellipse 60% 50% at 80% 0%, rgba(34,211,238,0.18), transparent 55%),
+      radial-gradient(ellipse 50% 40% at 110% 80%, rgba(251,113,133,0.10), transparent 60%),
+      radial-gradient(ellipse 60% 40% at -10% 110%, rgba(163,230,53,0.08), transparent 60%);
+    pointer-events: none;
+  }
+  section.hero::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 64px 64px;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse 90% 70% at 50% 50%, black 30%, transparent 90%);
+    -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 50%, black 30%, transparent 90%);
+  }
+  .hero-inner { position: relative; z-index: 2; }
+
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 72px;
+    align-items: center;
+  }
+
+  .hero-eyebrow-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 14px 6px 12px;
+    border: 1px solid rgba(34,211,238,0.3);
+    background: rgba(34,211,238,0.06);
+    border-radius: 100px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    color: var(--cyan);
+    margin-bottom: 28px;
+  }
+  .hero-eyebrow-tag .pulse {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 0 0 rgba(34,211,238,0.6);
+    animation: pulse 2.4s infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(34,211,238,0.5); }
+    70%  { box-shadow: 0 0 0 8px rgba(34,211,238,0); }
+    100% { box-shadow: 0 0 0 0 rgba(34,211,238,0); }
+  }
+
+  .hero h1 { color: var(--text-light); margin-bottom: 24px; }
+
+  .hero-sub {
+    font-size: 19px;
+    line-height: 1.5;
+    color: var(--text-light-mute);
+    max-width: 38ch;
+    margin-bottom: 36px;
+  }
+
+  .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; }
+
+  /* Hero code preview */
+  .code-block {
+    background: var(--midnight-2);
+    border: 1px solid var(--border-dark-2);
+    border-radius: 8px;
+    overflow: hidden;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.7;
+    box-shadow: 0 30px 60px -20px rgba(0,0,0,0.5), 0 0 0 1px rgba(34,211,238,0.05);
+  }
+  .code-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-dark-2);
+    background: rgba(0,0,0,0.2);
+    font-size: 11px;
+    color: var(--text-light-dim);
+    letter-spacing: 0.05em;
+  }
+  .code-header .dots { display: flex; gap: 6px; }
+  .code-header .dots span {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--border-dark-2);
+  }
+  .code-body { padding: 18px 22px; overflow-x: auto; }
+  .code-body pre { font-family: inherit; color: #d6e0ee; }
+  .code-body .kw  { color: #c4a8ff; }
+  .code-body .fn  { color: #22d3ee; }
+  .code-body .str { color: #f9c270; }
+  .code-body .num { color: #ff9670; }
+  .code-body .com { color: #6c7689; font-style: italic; }
+  .code-body .var { color: #d6e0ee; }
+  .code-body .dec { color: #88d8ff; }
+  .code-output {
+    border-top: 1px solid var(--border-dark-2);
+    background: rgba(0,0,0,0.28);
+    padding: 16px 22px;
+    font-size: 12.5px;
+    line-height: 1.7;
+  }
+  .code-output .blocked { color: var(--block); font-weight: 600; }
+  .code-output .warn-t  { color: var(--warn); font-weight: 500; }
+  .code-output .label   { color: var(--text-light-dim); }
+  .code-output .val     { color: #d6e0ee; }
+
+  /* Hero stats strip */
+  .hero-stats {
+    margin-top: 72px;
+    padding-top: 44px;
+    border-top: 1px solid var(--border-dark);
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 28px;
+  }
+  .hero-stat .num {
+    font-size: 36px;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    color: var(--text-light);
+    line-height: 1;
+    margin-bottom: 10px;
+  }
+  .hero-stat .num .unit {
+    font-size: 22px;
+    color: var(--text-light-mute);
+    margin-left: 2px;
+    font-weight: 500;
+  }
+  .hero-stat .lab {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-light-dim);
+    line-height: 1.4;
+  }
+
+  /* —————————————————————— FRAMEWORK STRIP ——————————————————————— */
+  section.frameworks {
+    background: var(--bg-light);
+    padding: 56px 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .fw-label {
+    text-align: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-mute-2);
+    margin-bottom: 28px;
+  }
+  .fw-list {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: wrap;
+    color: var(--text-mute);
+    font-weight: 500;
+    font-size: 16px;
+  }
+  .fw-list span {
+    padding: 0 28px;
+    transition: color 0.15s;
+  }
+  .fw-list span:hover { color: var(--midnight); }
+  .fw-list span:nth-of-type(1):hover  { color: var(--cyan-deep); }
+  .fw-list span:nth-of-type(3):hover  { color: var(--violet-deep); }
+  .fw-list span:nth-of-type(5):hover  { color: var(--lime-deep); }
+  .fw-list span:nth-of-type(7):hover  { color: var(--coral-deep); }
+  .fw-list span:nth-of-type(9):hover  { color: var(--amber-deep); }
+  .fw-list span:nth-of-type(11):hover { color: var(--sky-deep); }
+  .fw-list span:nth-of-type(13):hover { color: var(--violet-deep); }
+  .fw-list span:nth-of-type(15):hover { color: var(--lime-deep); }
+  .fw-list .sep {
+    width: 4px;
+    height: 4px;
+    background: var(--border-light-2);
+    border-radius: 50%;
+    padding: 0;
+  }
+
+  /* —————————————————————— SECTION SHELL ——————————————————————— */
+  section.light {
+    background: var(--bg-light);
+    padding: 100px 0;
+    color: var(--text-dark);
+  }
+  section.light.tint-violet {
+    background: linear-gradient(180deg, var(--bg-light) 0%, #f5f0fa 50%, var(--bg-light) 100%);
+  }
+  section.light.tint-cyan {
+    background: linear-gradient(180deg, var(--bg-light) 0%, #ecfafe 50%, var(--bg-light) 100%);
+  }
+  section.light.tint-amber {
+    background: linear-gradient(180deg, var(--bg-light) 0%, #fdf8ed 50%, var(--bg-light) 100%);
+  }
+  section.dark {
+    background: var(--midnight);
+    padding: 100px 0;
+    color: var(--text-light);
+    position: relative;
+    overflow: hidden;
+  }
+  section.dark::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+    background-size: 72px 72px;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 40%, transparent 95%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black 40%, transparent 95%);
+  }
+  section.dark > .container { position: relative; z-index: 1; }
+  section.dark p { color: var(--text-light-mute); }
+
+  .section-head {
+    max-width: 760px;
+    margin-bottom: 64px;
+  }
+  .section-head h2 {
+    margin-top: 18px;
+    margin-bottom: 22px;
+  }
+  .section-head p {
+    font-size: 19px;
+    line-height: 1.5;
+  }
+
+  /* —————————————————————— PILLARS ——————————————————————— */
+  .pillar-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+  .pillar {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 32px 28px;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  .pillar::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--p-color, var(--cyan));
+  }
+  .pillar:hover {
+    border-color: var(--midnight);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -16px rgba(10,22,40,0.18);
+  }
+  .pillar-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: var(--p-bg, var(--midnight));
+    color: var(--p-color, var(--cyan));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pillar h3 { font-size: 20px; }
+  .pillar p { font-size: 15px; line-height: 1.6; color: var(--text-mute); }
+
+  /* Pillar colors: engineering=cyan, deterministic=violet, cross-platform=lime */
+  .pillar.p-engineering    { --p-color: var(--cyan-deep);   --p-bg: var(--cyan-soft);   }
+  .pillar.p-deterministic  { --p-color: var(--violet-deep); --p-bg: var(--violet-soft); }
+  .pillar.p-crossplatform  { --p-color: var(--lime-deep);   --p-bg: var(--lime-soft);   }
+
+  /* —————————————————————— ROLE CARDS (4 roles) ——————————————————————— */
+  .role-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+  .role-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 36px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    transition: all 0.2s ease;
+    min-height: 280px;
+    position: relative;
+    overflow: hidden;
+  }
+  .role-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: var(--role-color, var(--cyan));
+  }
+  .role-card:hover {
+    border-color: var(--midnight);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -16px rgba(10,22,40,0.18);
+  }
+  .role-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 4px;
+  }
+  .role-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: var(--role-bg, var(--midnight));
+    color: var(--role-color, var(--cyan));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .role-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--role-deep, var(--cyan-deep));
+  }
+  .role-card h3 {
+    font-size: 23px;
+    line-height: 1.25;
+    color: var(--midnight);
+  }
+  .role-card > p {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--text-mute);
+    margin: 0;
+  }
+  .role-bullets {
+    list-style: none;
+    padding: 0;
+    margin: 4px 0 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border-top: 1px solid var(--border-light);
+    padding-top: 18px;
+  }
+  .role-bullets li {
+    font-size: 15.5px;
+    line-height: 1.6;
+    color: var(--text-dark);
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .role-bullets li::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    background: var(--role-color, var(--cyan));
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 9px;
+  }
+  .role-card .link-cyan {
+    margin-top: auto;
+    padding-top: 8px;
+    font-size: 15px;
+    color: var(--role-deep, var(--cyan-deep));
+  }
+
+  /* Role-specific themes */
+  .role-card.developer    { --role-color: var(--cyan);   --role-deep: var(--cyan-deep);   --role-bg: var(--cyan-soft);   }
+  .role-card.developer .role-icon  { background: var(--cyan-soft);   color: var(--cyan-deep);   }
+  .role-card.platform     { --role-color: var(--violet); --role-deep: var(--violet-deep); --role-bg: var(--violet-soft); }
+  .role-card.platform .role-icon   { background: var(--violet-soft); color: var(--violet-deep); }
+  .role-card.ciso         { --role-color: var(--coral);  --role-deep: var(--coral-deep);  --role-bg: var(--coral-soft);  }
+  .role-card.ciso .role-icon       { background: var(--coral-soft);  color: var(--coral-deep);  }
+  .role-card.compliance   { --role-color: var(--amber);  --role-deep: var(--amber-deep);  --role-bg: var(--amber-soft);  }
+  .role-card.compliance .role-icon { background: var(--amber-soft);  color: var(--amber-deep);  }
+
+  /* —————————————————————— PRIORITY CARDS ——————————————————————— */
+  .priority-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--border-light);
+    border-left: 1px solid var(--border-light);
+  }
+  .priority {
+    background: var(--bg-light);
+    border-right: 1px solid var(--border-light);
+    border-bottom: 1px solid var(--border-light);
+    padding: 40px 36px;
+    display: flex;
+    gap: 28px;
+    align-items: flex-start;
+    transition: background 0.2s;
+    min-height: 240px;
+  }
+  .priority:hover { background: var(--bg-card); }
+  .priority-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--cyan-deep);
+    font-weight: 500;
+    flex-shrink: 0;
+    padding-top: 6px;
+    width: 36px;
+  }
+  .priority-body { flex: 1; }
+  .priority h3 {
+    font-size: 22px;
+    margin-bottom: 14px;
+    line-height: 1.25;
+  }
+  .priority p {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-mute);
+    margin-bottom: 18px;
+  }
+
+  /* —————————————————————— PLATFORM (DARK) ——————————————————————— */
+  .platform-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  .platform-card {
+    background: var(--midnight-2);
+    border: 1px solid var(--border-dark-2);
+    border-radius: 10px;
+    padding: 36px 30px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    min-height: 360px;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .platform-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--pc-color, var(--cyan));
+  }
+  .platform-card:hover {
+    border-color: var(--pc-color, var(--cyan));
+    background: var(--midnight-3);
+  }
+  .platform-card .pc-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: var(--pc-bg, rgba(34,211,238,0.1));
+    border: 1px solid var(--pc-border, rgba(34,211,238,0.3));
+    color: var(--pc-color, var(--cyan));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 4px;
+  }
+  .platform-card h3 { color: var(--text-light); font-size: 22px; }
+  .platform-card p { font-size: 15px; line-height: 1.65; color: var(--text-light-mute); flex: 1; }
+
+  /* Component themes */
+  .platform-card.engine     { --pc-color: var(--cyan);   --pc-bg: rgba(34,211,238,0.10);  --pc-border: rgba(34,211,238,0.30); }
+  .platform-card.taxonomy   { --pc-color: var(--violet); --pc-bg: rgba(167,139,250,0.10); --pc-border: rgba(167,139,250,0.35); }
+  .platform-card.compliance { --pc-color: var(--amber);  --pc-bg: rgba(251,191,36,0.10);  --pc-border: rgba(251,191,36,0.35); }
+  .platform-card.taxonomy h3, .platform-card.compliance h3 { color: var(--text-light); }
+  .platform-card.taxonomy .link-cyan { color: var(--violet); }
+  .platform-card.taxonomy .link-cyan:hover { color: #c4b5fd; }
+  .platform-card.compliance .link-cyan { color: var(--amber); }
+  .platform-card.compliance .link-cyan:hover { color: #fcd34d; }
+
+  .platform-banner {
+    margin-top: 32px;
+    padding: 28px 32px;
+    background: linear-gradient(90deg, rgba(34,211,238,0.08), transparent 60%);
+    border: 1px solid rgba(34,211,238,0.2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 32px;
+  }
+  .platform-banner h4 { color: var(--text-light); font-size: 18px; margin-bottom: 6px; }
+  .platform-banner p { color: var(--text-light-mute); font-size: 14.5px; margin: 0; max-width: 60ch; }
+
+  /* —————————————————————— STATS ——————————————————————— */
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--bg-card);
+  }
+  .stat-cell {
+    padding: 36px 28px;
+    border-right: 1px solid var(--border-light);
+    position: relative;
+  }
+  .stat-cell::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 28px;
+    right: 28px;
+    height: 3px;
+    background: var(--s-color, var(--cyan));
+    opacity: 0.7;
+  }
+  .stat-cell:last-child { border-right: none; }
+  .stat-cell .num {
+    font-size: 44px;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    color: var(--s-color, var(--midnight));
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+  .stat-cell .num .unit {
+    font-size: 24px;
+    color: var(--text-mute-2);
+    margin-left: 2px;
+    font-weight: 500;
+  }
+  .stat-cell .lab {
+    font-size: 13px;
+    color: var(--text-mute);
+    line-height: 1.45;
+  }
+  .stat-cell.s-1 { --s-color: var(--cyan-deep); }
+  .stat-cell.s-2 { --s-color: var(--violet-deep); }
+  .stat-cell.s-3 { --s-color: var(--coral-deep); }
+  .stat-cell.s-4 { --s-color: var(--lime-deep); }
+  .stat-cell.s-5 { --s-color: var(--amber-deep); }
+
+  /* —————————————————————— VERTICAL CARDS ——————————————————————— */
+  .vertical-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  .vertical-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    transition: all 0.2s ease;
+    min-height: 280px;
+  }
+  .vertical-card:hover {
+    border-color: var(--midnight);
+    transform: translateY(-2px);
+  }
+  .vertical-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .vertical-card .compliance-list {
+    margin-top: auto;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-light);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-mute);
+    letter-spacing: 0.02em;
+    line-height: 1.75;
+  }
+  .vertical-card .compliance-list::before {
+    content: 'COMPLIANCE';
+    display: block;
+    font-size: 10px;
+    color: var(--cyan-deep);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+
+  /* Cross-vertical strip */
+  .cross-vertical {
+    margin-top: 32px;
+    padding: 32px 36px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+  }
+  .cv-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--cyan-deep);
+    font-weight: 600;
+    margin-bottom: 10px;
+  }
+  .cv-headline {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: var(--midnight);
+    margin-bottom: 8px;
+    line-height: 1.35;
+  }
+  .cv-body {
+    font-size: 14.5px;
+    color: var(--text-mute);
+    margin-bottom: 24px;
+    line-height: 1.55;
+    max-width: 75ch;
+  }
+  .cv-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0;
+    border-top: 1px solid var(--border-light);
+    padding-top: 22px;
+  }
+  .cv-item {
+    padding: 0 20px;
+    border-right: 1px solid var(--border-light);
+    position: relative;
+  }
+  .cv-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 20px;
+    width: 24px;
+    height: 3px;
+    background: var(--cv-color, var(--cyan));
+    border-radius: 2px;
+    margin-bottom: 14px;
+    transform: translateY(-22px);
+  }
+  .cv-item:first-child { padding-left: 0; }
+  .cv-item:first-child::before { left: 0; }
+  .cv-item:last-child { border-right: none; padding-right: 0; }
+  .cv-item strong {
+    font-size: 16px;
+    color: var(--midnight);
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    padding-top: 8px;
+  }
+  .cv-item span {
+    font-size: 12.5px;
+    color: var(--text-mute);
+    line-height: 1.5;
+  }
+  /* Cross-vertical framework colors */
+  .cv-item.eu       { --cv-color: var(--sky); }
+  .cv-item.colorado { --cv-color: var(--cyan); }
+  .cv-item.nist     { --cv-color: var(--lime); }
+  .cv-item.iso      { --cv-color: var(--violet); }
+  .cv-item.soc      { --cv-color: var(--amber); }
+
+  @media (max-width: 1100px) {
+    .cv-grid { grid-template-columns: repeat(2, 1fr); gap: 24px 0; }
+    .cv-item { padding: 0 20px; border-right: 1px solid var(--border-light); border-bottom: 1px solid var(--border-light); padding-bottom: 18px; }
+    .cv-item:nth-child(2n) { border-right: none; }
+    .cv-item:nth-last-child(-n+1) { border-bottom: none; padding-bottom: 0; }
+  }
+  @media (max-width: 760px) {
+    .cv-grid { grid-template-columns: 1fr; gap: 18px; }
+    .cv-item { padding: 0; border-right: none; border-bottom: 1px solid var(--border-light); padding-bottom: 18px; }
+    .cv-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .cv-item::before { left: 0; }
+  }
+  .vertical-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: var(--v-bg, var(--midnight));
+    color: var(--v-color, var(--cyan));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    margin-bottom: 6px;
+  }
+  .vertical-card h3 {
+    font-size: 20px;
+    color: var(--midnight);
+  }
+  .vertical-card p {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--text-mute);
+  }
+
+  /* Vertical-specific themes */
+  .vertical-card.fintech     { --v-color: var(--lime-deep);   --v-bg: var(--lime-soft);   }
+  .vertical-card.collections { --v-color: var(--amber-deep);  --v-bg: var(--amber-soft);  }
+  .vertical-card.insurance   { --v-color: var(--sky-deep);    --v-bg: var(--sky-soft);    }
+  .vertical-card.legal       { --v-color: var(--violet-deep); --v-bg: var(--violet-soft); }
+  .vertical-card.healthcare  { --v-color: var(--coral-deep);  --v-bg: var(--coral-soft);  }
+  .vertical-card.hr          { --v-color: var(--cyan-deep);   --v-bg: var(--cyan-soft);   }
+
+  /* Vertical card top accent stripe */
+  .vertical-card {
+    position: relative;
+    overflow: hidden;
+  }
+  .vertical-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--v-color, var(--cyan));
+    opacity: 0.85;
+  }
+  .urgency-pill {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    padding: 3px 8px;
+    border-radius: 3px;
+    text-transform: uppercase;
+  }
+  .urgency-pill.urgent { background: rgba(239,68,68,0.1); color: var(--block); }
+  .urgency-pill.high   { background: rgba(245,158,11,0.12); color: var(--warn); }
+  .urgency-pill.medium { background: rgba(34,211,238,0.1); color: var(--cyan-deep); }
+
+  /* —————————————————————— DESIGN PARTNER ——————————————————————— */
+  .dp-block {
+    border: 1px solid rgba(34,211,238,0.2);
+    border-radius: 14px;
+    padding: 56px 56px;
+    background:
+      radial-gradient(ellipse 50% 80% at 100% 50%, rgba(34,211,238,0.08), transparent 60%),
+      var(--midnight-2);
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 56px;
+    align-items: center;
+  }
+  .dp-block h2 { color: var(--text-light); margin-bottom: 18px; }
+  .dp-block p { color: var(--text-light-mute); font-size: 16px; line-height: 1.6; margin-bottom: 12px; }
+  .dp-block .criteria {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-dark-2);
+    font-size: 13.5px;
+    color: var(--text-light-dim);
+    line-height: 1.6;
+  }
+  .dp-block .criteria strong {
+    color: var(--cyan);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+  .dp-cta { text-align: right; }
+  .dp-spots {
+    display: inline-block;
+    padding: 6px 14px;
+    background: rgba(34,211,238,0.1);
+    border: 1px solid rgba(34,211,238,0.25);
+    border-radius: 100px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--cyan);
+    letter-spacing: 0.1em;
+    margin-bottom: 24px;
+  }
+
+  /* —————————————————————— RESOURCES ——————————————————————— */
+  .resource-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+  }
+  .resource {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    padding: 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    transition: all 0.2s ease;
+    min-height: 220px;
+  }
+  .resource:hover {
+    border-color: var(--midnight);
+    transform: translateY(-2px);
+  }
+  .resource .r-type {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--cyan-deep);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .resource h4 { font-size: 17px; line-height: 1.3; }
+  .resource p { font-size: 14px; line-height: 1.5; color: var(--text-mute); flex: 1; margin: 0; }
+  .resource .r-link {
+    color: var(--midnight);
+    font-weight: 500;
+    font-size: 13.5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* —————————————————————— FINAL CTA ——————————————————————— */
+  section.final {
+    background: var(--midnight);
+    padding: 110px 0 100px;
+    color: var(--text-light);
+    position: relative;
+    overflow: hidden;
+    border-top: 1px solid var(--border-dark);
+  }
+  section.final::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 70% 60% at 50% 0%, rgba(34,211,238,0.1), transparent 70%);
+    pointer-events: none;
+  }
+  .final-inner {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .terminal {
+    display: inline-flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 32px;
+    background: var(--midnight-2);
+    border: 1px solid var(--border-dark-2);
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    color: var(--text-light);
+    margin-bottom: 36px;
+  }
+  .terminal .prompt { color: var(--cyan); }
+  .terminal .cursor {
+    display: inline-block;
+    width: 9px;
+    height: 19px;
+    background: var(--cyan);
+    margin-left: 4px;
+    animation: blink 1.1s infinite;
+    vertical-align: -3px;
+  }
+  @keyframes blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
+  section.final h2 { color: var(--text-light); font-size: clamp(36px, 4.5vw, 56px); margin-bottom: 24px; }
+  section.final p {
+    color: var(--text-light-mute);
+    font-size: 18px;
+    margin: 0 auto 36px;
+    max-width: 50ch;
+  }
+  .final-cta { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; }
+
+  /* —————————————————————— FOOTER ——————————————————————— */
+  footer {
+    background: var(--midnight);
+    color: var(--text-light-mute);
+    border-top: 1px solid var(--border-dark);
+    padding: 72px 32px 48px;
+  }
+  .footer-inner {
+    max-width: 1240px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
+    gap: 56px;
+  }
+  .footer-brand .wordmark { margin-bottom: 18px; }
+  .footer-brand p {
+    font-size: 14px;
+    color: var(--text-light-dim);
+    line-height: 1.6;
+    max-width: 32ch;
+  }
+  .footer-col h5 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-light);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin-bottom: 18px;
+    font-weight: 600;
+  }
+  .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .footer-col a {
+    font-size: 14px;
+    color: var(--text-light-mute);
+    transition: color 0.15s;
+  }
+  .footer-col a:hover { color: var(--cyan); }
+  .footer-bottom {
+    max-width: 1240px;
+    margin: 56px auto 0;
+    padding-top: 32px;
+    border-top: 1px solid var(--border-dark);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--text-light-dim);
+    letter-spacing: 0.04em;
+  }
+  .footer-social { display: flex; gap: 18px; }
+  .footer-social a { color: var(--text-light-dim); }
+  .footer-social a:hover { color: var(--cyan); }
+
+  /* —————————————————————— RESPONSIVE ——————————————————————— */
+  @media (max-width: 1100px) {
+    .hero-grid { grid-template-columns: 1fr; gap: 56px; }
+    .hero-stats { grid-template-columns: repeat(3, 1fr); gap: 28px 32px; }
+    .stat-grid { grid-template-columns: repeat(2, 1fr); }
+    .stat-cell { border-bottom: 1px solid var(--border-light); }
+    .stat-cell:nth-child(odd) { border-right: 1px solid var(--border-light); }
+    .stat-cell:last-child { border-right: none; border-bottom: none; }
+    .resource-grid { grid-template-columns: repeat(2, 1fr); }
+    .role-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 900px) {
+    .pillar-grid, .platform-grid, .vertical-grid { grid-template-columns: 1fr; }
+    .priority-grid { grid-template-columns: 1fr; }
+    .dp-block { grid-template-columns: 1fr; padding: 40px 32px; gap: 32px; }
+    .dp-cta { text-align: left; }
+    .footer-inner { grid-template-columns: 1fr 1fr; gap: 40px; }
+    .footer-brand { grid-column: 1 / -1; }
+    .nav-links { display: none; }
+    section.light, section.dark { padding: 72px 0; }
+    .hero { padding: 64px 0 56px; }
+    .hero-stats { grid-template-columns: repeat(2, 1fr); }
+    .hero-stat .num { font-size: 28px; }
+    .stat-cell .num { font-size: 32px; }
+  }
+  @media (max-width: 600px) {
+    .container { padding: 0 20px; }
+    .nav-inner { padding: 14px 20px; }
+    .nav-left { gap: 0; }
+    .footer-inner { grid-template-columns: 1fr; }
+    .footer-bottom { flex-direction: column; gap: 16px; align-items: flex-start; }
+    .promo { font-size: 12.5px; padding: 10px 16px; }
+    .priority { padding: 28px 24px; gap: 18px; }
+    .terminal { font-size: 14px; padding: 14px 22px; }
+  }
+
+  /* Fade-in */
+  .fade-in {
+    opacity: 0;
+    transform: translateY(10px);
+    animation: fadeIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  @keyframes fadeIn { to { opacity: 1; transform: translateY(0); } }
+  .d1 { animation-delay: 0.05s; }
+  .d2 { animation-delay: 0.15s; }
+  .d3 { animation-delay: 0.28s; }
+  .d4 { animation-delay: 0.42s; }
+  .d5 { animation-delay: 0.55s; }
+</style>
+</head>
+<body>
+
+<!-- ——————————————————— PROMO BANNER ——————————————————— -->
+<div class="promo">
+  <span class="pill">BETA</span>
+  Design partner program — fintech, insurtech, healthtech teams shipping AI agents into production.
+  <a href="#design-partner">Apply &rarr;</a>
+</div>
+
+<!-- ——————————————————— NAV ——————————————————— -->
+<nav class="main">
+  <div class="nav-inner">
+    <div class="nav-left">
+      <a href="#" class="wordmark">
+        <span class="logo-mark">
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 24 14 L 14 14 L 14 50 L 24 50 M 40 14 L 50 14 L 50 50 L 40 50"
+                  stroke="#22d3ee" stroke-width="9" fill="none"
+                  stroke-linecap="square" stroke-linejoin="miter"/>
+            <circle cx="32" cy="32" r="6" fill="#22d3ee"/>
+          </svg>
+        </span>
+        permit0
+      </a>
+      <div class="nav-links">
+        <a href="#platform">Product <span class="chev">▾</span></a>
+        <a href="#verticals">Solutions <span class="chev">▾</span></a>
+        <a href="#taxonomy">Taxonomy</a>
+        <a href="#resources">Resources</a>
+        <a href="#">Company <span class="chev">▾</span></a>
+      </div>
+    </div>
+    <div class="nav-right">
+      <a href="#design-partner" class="btn btn-dark btn-sm">Talk to founders</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ——————————————————— HERO ——————————————————— -->
+<section class="hero dark">
+  <div class="container hero-inner">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-eyebrow-tag fade-in d1">
+          <span class="pulse"></span>
+          OPEN SOURCE · PRE-EXECUTION ACTION AUTHORIZATION
+        </div>
+        <h1 class="fade-in d2">
+          Action authorization layer<br>
+          for AI agents.
+        </h1>
+        <p class="hero-sub fade-in d3">
+          Permit0 is the action authorization layer for AI agents — the deterministic policy enforcement between what an agent decides and what it executes. We provide a canonical taxonomy of agent actions across 20 domains, risk defaults, and compliance mappings. Built for engineering teams shipping agents into production with trust.
+        </p>
+        <div class="hero-cta fade-in d4">
+          <a href="#design-partner" class="btn btn-primary btn-lg">Talk to founders <span class="arrow">→</span></a>
+          <a href="https://github.com/permit0-ai/permit0-core" class="btn btn-ghost-dark btn-lg">View on GitHub</a>
+        </div>
+      </div>
+
+      <!-- Code preview -->
+      <div class="fade-in d3">
+        <div class="code-block">
+          <div class="code-header">
+            <div class="dots"><span></span><span></span><span></span></div>
+            <span>support_agent.py</span>
+          </div>
+          <div class="code-body">
+<pre><span class="kw">from</span> <span class="var">permit0</span> <span class="kw">import</span> <span class="var">guard</span>, <span class="var">permit</span>
+
+<span class="dec">@guard</span>
+<span class="kw">def</span> <span class="fn">refund_customer</span>(<span class="var">charge_id</span>, <span class="var">amount</span>):
+    <span class="var">permit</span>.<span class="fn">require</span>(<span class="str">"payments.refund"</span>, {
+        <span class="str">"amount"</span>: <span class="var">amount</span>,
+        <span class="str">"actor"</span>: <span class="str">"support_agent_v2"</span>,
+    })
+    <span class="kw">return</span> <span class="var">stripe</span>.<span class="var">Refund</span>.<span class="fn">create</span>(<span class="var">charge_id</span>)
+
+<span class="com"># agent fires this after a customer complaint</span>
+<span class="fn">refund_customer</span>(<span class="str">"ch_3O9k..."</span>, <span class="var">amount</span>=<span class="num">85000</span>)</pre>
+          </div>
+          <div class="code-output">
+            <div><span class="blocked">✗ BLOCKED</span> &nbsp;<span class="label">action=</span><span class="val">payments.refund</span></div>
+            <div><span class="label">risk:</span> <span class="val">82/100</span> &nbsp;<span class="label">flags:</span> <span class="val">FINANCIAL · MUTATION</span></div>
+            <div><span class="label">reason:</span> <span class="val">amount &gt; $1,000 requires human approval</span></div>
+            <div><span class="label">escalated:</span> <span class="warn-t">→ human_review</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero stats -->
+    <div class="hero-stats fade-in d5">
+      <div class="hero-stat">
+        <div class="num">119</div>
+        <div class="lab">Canonical actions</div>
+      </div>
+      <div class="hero-stat">
+        <div class="num">20</div>
+        <div class="lab">Action domains</div>
+      </div>
+      <div class="hero-stat">
+        <div class="num">9 <span class="unit">×</span> 10</div>
+        <div class="lab">Risk dims (flags × amplifiers)</div>
+      </div>
+      <div class="hero-stat">
+        <div class="num">&lt;5<span class="unit">ms</span></div>
+        <div class="lab">p99 enforcement</div>
+      </div>
+      <div class="hero-stat">
+        <div class="num">3</div>
+        <div class="lab">Deployment modes</div>
+      </div>
+      <div class="hero-stat">
+        <div class="num">10<span class="unit">+</span></div>
+        <div class="lab">AI compliance mappings</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ——————————————————— FRAMEWORK STRIP ——————————————————— -->
+<section class="frameworks">
+  <div class="container">
+    <div class="fw-label">Compatible with the agent stack you already run</div>
+    <div class="fw-list">
+      <span>LangChain</span>
+      <span class="sep"></span>
+      <span>Model Context Protocol</span>
+      <span class="sep"></span>
+      <span>CrewAI</span>
+      <span class="sep"></span>
+      <span>OpenClaw</span>
+      <span class="sep"></span>
+      <span>AutoGen</span>
+      <span class="sep"></span>
+      <span>LangGraph</span>
+      <span class="sep"></span>
+      <span>OpenAI Agents SDK</span>
+      <span class="sep"></span>
+      <span>Claude Skills</span>
+    </div>
+  </div>
+</section>
+
+<!-- ——————————————————— WHY PERMIT0 ——————————————————— -->
+<section class="light" id="why">
+  <div class="container">
+    <div class="section-head">
+      <div class="eyebrow">Why permit0</div>
+      <h2>The layer no incumbent will build.</h2>
+      <p>Identity layers control which agents exist. Observability layers report what already happened. Platform vendors govern only what runs inside their boundary. Cross-platform action authorization — the layer that decides whether a specific action gets to execute, in real time, before it does — is structurally opposed to every incumbent's business model. So we built it.</p>
+    </div>
+
+    <div class="pillar-grid">
+      <div class="pillar p-engineering">
+        <div class="pillar-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+            <path d="M12 2 L3 7 L3 13 C3 18 7 21 12 22 C17 21 21 18 21 13 L21 7 Z"/>
+            <path d="M9 12 L11 14 L15 10"/>
+          </svg>
+        </div>
+        <h3>Engineering credibility you can audit</h3>
+        <p>Built by engineers who shipped service infrastructure at Google Cloud and enterprise audit and trust at Salesforce. The architecture is published, the code is open, the risk model is mathematically defensible.</p>
+      </div>
+
+      <div class="pillar p-deterministic">
+        <div class="pillar-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+            <rect x="5" y="11" width="14" height="10"/>
+            <path d="M8 11 L8 7 C8 4.8 9.8 3 12 3 C14.2 3 16 4.8 16 7 L16 11"/>
+          </svg>
+        </div>
+        <h3>Deterministic where it counts</h3>
+        <p>The decision path is rules and cryptography. No model sits in the hot path. Every block, allow, and escalation is replayable, signed, and grounded in a policy your team owns. AI helps author the policy. It never makes the call.</p>
+      </div>
+
+      <div class="pillar p-crossplatform">
+        <div class="pillar-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+            <path d="M3 7 L12 3 L21 7 L12 11 Z"/>
+            <path d="M3 12 L12 16 L21 12"/>
+            <path d="M3 17 L12 21 L21 17"/>
+          </svg>
+        </div>
+        <h3>Cross-platform by design</h3>
+        <p>Salesforce Agentforce governs Salesforce. Microsoft Agent 365 governs Microsoft. Okta Agent Gateway governs identity. Permit0 governs the <em>action</em> — whether the agent reads from Salesforce, processes through OpenAI, and refunds through Stripe. One policy, one audit trail, one source of truth across every framework, every tool, every cloud.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ——————————————————— BUILT FOR FOUR ROLES ——————————————————— -->
+<section class="light" id="roles" style="padding-top: 0;">
+  <div class="container">
+    <div class="section-head">
+      <div class="eyebrow">Built for four roles</div>
+      <h2>Four roles. One control plane.</h2>
+      <p>Every policy engine ships an empty policy. Permit0 is the layer that ends the patching — providing central policy control, compliance-grade auditing, and the trust your team needs to deploy agents into production.</p>
+    </div>
+
+    <div class="role-grid">
+
+      <!-- DEVELOPERS -->
+      <div class="role-card developer">
+        <div class="role-head">
+          <div class="role-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+              <path d="M4 6 L9 12 L4 18"/>
+              <path d="M12 18 L20 18"/>
+            </svg>
+          </div>
+          <div class="role-label">Developers</div>
+        </div>
+        <h3>Ship agents faster, with authorization built in.</h3>
+        <p>Stop writing permission checks inside agent code. Full risk taxonomy and production-grade defaults — <span class="mono" style="color:var(--midnight); font-weight:500;">pip install</span>, ship.</p>
+        <ul class="role-bullets">
+          <li>5-minute integration with LangChain, MCP, CrewAI, OpenClaw, and raw Python tools</li>
+          <li>119 default actions across 20 domains, with risk policies on day one</li>
+          <li>Free forever for OSS — full SDK, no rate limits</li>
+        </ul>
+        <a href="/docs/quickstart" class="link-cyan">Get started in 5 minutes <span class="arrow">→</span></a>
+      </div>
+
+      <!-- PLATFORM ENGINEERING LEADS -->
+      <div class="role-card platform">
+        <div class="role-head">
+          <div class="role-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+              <rect x="3" y="3" width="8" height="8"/>
+              <rect x="13" y="3" width="8" height="8"/>
+              <rect x="3" y="13" width="8" height="8"/>
+              <rect x="13" y="13" width="8" height="8"/>
+            </svg>
+          </div>
+          <div class="role-label">Platform Engineering Leads</div>
+        </div>
+        <h3>One policy layer across every agent your teams ship.</h3>
+        <p>Every framework, every tool, every team — each reinventing authorization. Permit0 is the single control plane. Write the policy once. Enforce it everywhere.</p>
+        <ul class="role-bullets">
+          <li>Policy portability — the Tool Action Compiler normalizes any tool call into a canonical action across frameworks</li>
+          <li>Session-aware chain detection — dangerous action sequences get caught and escalated</li>
+          <li>VPC-native — cloud, self-hosted, or managed VPC; runs where your data lives</li>
+        </ul>
+        <a href="/architecture" class="link-cyan">See the architecture <span class="arrow">→</span></a>
+      </div>
+
+      <!-- CISOs -->
+      <div class="role-card ciso">
+        <div class="role-head">
+          <div class="role-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+              <path d="M12 2 L3 7 L3 13 C3 18 7 21 12 22 C17 21 21 18 21 13 L21 7 Z"/>
+              <path d="M12 8 L12 13"/>
+              <circle cx="12" cy="16" r="0.5" fill="currentColor"/>
+            </svg>
+          </div>
+          <div class="role-label">CISOs</div>
+        </div>
+        <h3>Agents do more, without expanding your threat surface.</h3>
+        <p>AI agents are your newest employees — no onboarding, no permission boundaries. 88% of organizations report AI agent incidents. Permit0 puts a deterministic gate between every decision and its execution.</p>
+        <ul class="role-bullets">
+          <li>Pre-execution enforcement — block bad actions before they fire</li>
+          <li>Cryptographic capability tokens — prompt injection can't bypass a signed gate</li>
+          <li>Global kill switch — your team retains override authority, every deployment mode</li>
+        </ul>
+        <a href="/threat-model" class="link-cyan">Read the threat model <span class="arrow">→</span></a>
+      </div>
+
+      <!-- COMPLIANCE LEADS -->
+      <div class="role-card compliance">
+        <div class="role-head">
+          <div class="role-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+              <path d="M5 3 L17 3 L19 5 L19 21 L5 21 Z"/>
+              <path d="M9 12 L11 14 L15 10"/>
+            </svg>
+          </div>
+          <div class="role-label">Compliance Leads</div>
+        </div>
+        <h3>Audit-ready evidence, before the auditor asks.</h3>
+        <p>Compliance has gone from quarterly review to deployment blocker. Permit0 gives your team replayable, exportable evidence — pre-mapped to the frameworks auditors already use.</p>
+        <ul class="role-bullets">
+          <li>Audit-of-record per decision — every block, allow, and escalation cryptographically signed</li>
+          <li>Replayable evidence — export any agent action in audit-grade format</li>
+          <li>Compliance packs — EU AI Act, Colorado AI Act, NIST AI RMF, ISO 42001, SOC 2, FINRA, HIPAA, SR 11-7, and more</li>
+        </ul>
+        <a href="/compliance" class="link-cyan">Read the compliance brief <span class="arrow">→</span></a>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ——————————————————— PLATFORM (DARK) ——————————————————— -->
+<section class="dark" id="platform">
+  <div class="container">
+    <div class="section-head">
+      <div class="eyebrow">The Permit0 platform</div>
+      <h2 style="color: var(--text-light);">Three components.<br>One control plane.</h2>
+      <p>Open source at the core. Self-hosted, managed VPC, or cloud — the policy decision runs where your data lives.</p>
+    </div>
+
+    <div class="platform-grid">
+      <div class="platform-card engine">
+        <div class="pc-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M12 1 L12 5 M12 19 L12 23 M4 12 L1 12 M23 12 L19 12 M5.6 5.6 L4 4 M20 20 L18.4 18.4 M5.6 18.4 L4 20 M20 4 L18.4 5.6"/>
+          </svg>
+        </div>
+        <h3>Permit0 Engine</h3>
+        <p>The deterministic policy engine. The Tool Action Compiler normalizes any tool call into a canonical action. The Risk Engine scores against 9 flags and 10 amplifiers. Two-stage review pairs a deterministic scorer with an optional LLM reviewer that can only deny or escalate — never approve. Capability tokens bind approved actions to payload hashes, constraint envelopes, and decision provenance.</p>
+        <a href="#" class="link-cyan">Architecture spec <span class="arrow">→</span></a>
+      </div>
+
+      <div class="platform-card taxonomy">
+        <div class="pc-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+            <path d="M5 3 L17 3 L19 5 L19 21 L5 21 Z"/>
+            <path d="M9 8 L15 8"/>
+            <path d="M9 12 L15 12"/>
+            <path d="M9 16 L13 16"/>
+          </svg>
+        </div>
+        <h3>Permit0 Taxonomy</h3>
+        <p>A canonical taxonomy of 119 agent actions across 20 domains — each scored across 9 risk dimensions with opinionated defaults. Open, versioned, citable. The vocabulary your auditor can verify against and the substrate every Permit0 deployment runs on. Ship a policy-guarded agent in days, not quarters.</p>
+        <a href="https://permit0-ai.github.io/permit0-site/taxonomy_v1.html" class="link-cyan">Read the spec <span class="arrow">→</span></a>
+      </div>
+
+      <div class="platform-card compliance">
+        <div class="pc-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+            <path d="M3 6 L21 6 L21 18 L3 18 Z"/>
+            <path d="M3 10 L21 10"/>
+            <path d="M7 14 L11 14"/>
+            <path d="M15 14 L17 14"/>
+          </svg>
+        </div>
+        <h3>Permit0 Compliance Center</h3>
+        <p>Audit-of-record evidence designed for the frameworks regulated buyers already work with — EU AI Act, Colorado AI Act, NIST AI RMF, ISO 42001, SOC 2, FINRA, HIPAA, SR 11-7, and more. Built to be the certifying authority your auditor recognizes.</p>
+        <a href="/compliance" class="link-cyan">Compliance roadmap <span class="arrow">→</span></a>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ——————————————————— STATS ——————————————————— -->
+<section class="light">
+  <div class="container">
+    <div class="section-head">
+      <div class="eyebrow">Engineered to be referenced</div>
+      <h2>Built to be cited by auditors,<br>not just adopted by developers.</h2>
+      <p>The taxonomy, the engine, and the deployment model are engineered for the auditor's spreadsheet — not just the developer's IDE.</p>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat-cell s-1">
+        <div class="num">119</div>
+        <div class="lab">Default canonical actions shipped</div>
+      </div>
+      <div class="stat-cell s-2">
+        <div class="num">20</div>
+        <div class="lab">Action domains covered out of the box</div>
+      </div>
+      <div class="stat-cell s-3">
+        <div class="num">&lt;5<span class="unit">ms</span></div>
+        <div class="lab">p99 policy enforcement latency</div>
+      </div>
+      <div class="stat-cell s-4">
+        <div class="num">9 <span class="unit">×</span> 10</div>
+        <div class="lab">Risk flags × amplifiers in the model</div>
+      </div>
+      <div class="stat-cell s-5">
+        <div class="num">10<span class="unit">+</span></div>
+        <div class="lab">Compliance frameworks mapped</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ——————————————————— VERTICALS ——————————————————— -->
+<section class="light" id="verticals" style="padding-top: 0;">
+  <div class="container">
+    <div class="section-head">
+      <div class="eyebrow">Where it matters first</div>
+      <h2>Built for the verticals where one bad action is a regulatory event.</h2>
+      <p>Permit0 leads with the segments that need pre-execution evidence — not post-hoc detection. The 2026 regulatory clock is short.</p>
+    </div>
+
+    <div class="vertical-grid">
+      <div class="vertical-card fintech">
+        <div class="vertical-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+            <ellipse cx="12" cy="6" rx="8" ry="3"/>
+            <path d="M4 6 L4 12 C4 13.7 7.6 15 12 15 C16.4 15 20 13.7 20 12 L20 6"/>
+            <path d="M4 12 L4 18 C4 19.7 7.6 21 12 21 C16.4 21 20 19.7 20 18 L20 12"/>
+          </svg>
+        </div>
+        <div class="vertical-head">
+          <h3>Fintech &amp; Payments</h3>
+        </div>
+        <p>Agents touching money have the highest blast radius. Refunds, transfers, ledger writes, KYC dispositions, SAR drafting. SR 11-7 and FFIEC examiners increasingly ask for pre-execution evidence on every autonomous action.</p>
+        <div class="compliance-list">EU AI Act Annex III · Colorado AI Act · CFPB Circular 2023-03 · ECOA · SR 11-7 · FFIEC · NACHA · BSA/AML · NYDFS Part 500</div>
+      </div>
+
+      <div class="vertical-card collections">
+        <div class="vertical-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+            <path d="M5 4 L9 4 L11 9 L8.5 10.5 C9.5 13 11 14.5 13.5 15.5 L15 13 L20 15 L20 19 C20 19.5 19.5 20 19 20 C11 20 4 13 4 5 C4 4.5 4.5 4 5 4 Z"/>
+          </svg>
+        </div>
+        <div class="vertical-head">
+          <h3>Collections &amp; Loan Servicing</h3>
+        </div>
+        <p>Voice and SMS agents under FDCPA, Reg F, and TCPA. Every outbound contact is a 7-in-7 / consent / time-of-day decision the CFPB can subpoena. Bureau-furnishing writes are irreversible under FCRA § 623.</p>
+        <div class="compliance-list">FDCPA · Reg F · TCPA · FCRA · UDAAP · CFPB AI guidance</div>
+      </div>
+
+      <div class="vertical-card insurance">
+        <div class="vertical-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+            <path d="M3 11 C3 6 7 3 12 3 C17 3 21 6 21 11"/>
+            <path d="M3 11 L21 11"/>
+            <path d="M12 3 L12 11"/>
+            <path d="M12 11 L12 19 C12 20.5 11 21.5 9.5 21.5"/>
+          </svg>
+        </div>
+        <div class="vertical-head">
+          <h3>Insurance &amp; Claims</h3>
+        </div>
+        <p>Claim approve / deny / pay agents. EU AI Act Annex III explicitly lists insurance pricing and claims as high-risk. Denials carry UDAAP and bad-faith exposure under state DOI rules.</p>
+        <div class="compliance-list">NAIC AI Model Bulletin (24+ states) · EU AI Act Annex III · NY DFS Letter 2024-7 · CO SB21-169 · NAIC · State DOI</div>
+      </div>
+
+      <div class="vertical-card legal">
+        <div class="vertical-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+            <path d="M12 3 L12 21"/>
+            <path d="M5 8 L19 8"/>
+            <path d="M5 8 L2 15 L8 15 L5 8"/>
+            <path d="M19 8 L16 15 L22 15 L19 8"/>
+            <path d="M8 21 L16 21"/>
+          </svg>
+        </div>
+        <div class="vertical-head">
+          <h3>Legal &amp; Contracting</h3>
+        </div>
+        <p>Privileged communications, contract drafting, e-signature dispatch. Lawyers understand liability instinctively — and they want the evidence trail, not just the audit log.</p>
+        <div class="compliance-list">ABA Formal Opinion 512 · State bar AI guidance (CA, FL, NY, NJ, PA) · ABA Model Rules · GDPR</div>
+      </div>
+
+      <div class="vertical-card healthcare">
+        <div class="vertical-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+            <path d="M9 3 L15 3 L15 9 L21 9 L21 15 L15 15 L15 21 L9 21 L9 15 L3 15 L3 9 L9 9 Z"/>
+          </svg>
+        </div>
+        <div class="vertical-head">
+          <h3>Healthcare</h3>
+        </div>
+        <p>PHI access, clinical-note generation, patient-facing communication, prior-auth and claims agents. Every action touching a patient record is a HIPAA event. EU AI Act Annex III explicitly lists health AI as high-risk and requires deployment-time controls Permit0 enforces.</p>
+        <div class="compliance-list">HHS Section 1557 (AI nondiscrimination) · HTI-1 / ONC DSI rule · EU AI Act Annex III · HIPAA · HITECH · 42 CFR Part 2</div>
+      </div>
+
+      <div class="vertical-card hr">
+        <div class="vertical-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square">
+            <circle cx="9" cy="8" r="3"/>
+            <circle cx="17" cy="8" r="2.5"/>
+            <path d="M3 19 C3 16 5.5 14 9 14 C12.5 14 15 16 15 19"/>
+            <path d="M14 14.5 C15.2 14.2 16.1 14 17 14 C19.5 14 21.5 15.5 21.5 18"/>
+          </svg>
+        </div>
+        <div class="vertical-head">
+          <h3>HR &amp; Employment</h3>
+        </div>
+        <p>Resume screening, candidate scoring, performance assessment, benefits enrollment. EEOC has signaled AI hiring tools are subject to existing anti-discrimination law. NYC LL 144 mandates pre-deployment bias audits. Illinois AIVID and Colorado AI Act add state-level disclosure and impact-assessment requirements.</p>
+        <div class="compliance-list">EU AI Act Annex III · EEOC · NYC LL 144 · IL AIVID · CO AI Act · GDPR Art. 22</div>
+      </div>
+    </div>
+
+    <!-- Cross-vertical AI governance strip -->
+    <div class="cross-vertical">
+      <div class="cv-label">+ Cross-vertical AI governance</div>
+      <div class="cv-headline">Every Permit0 deployment also maps to the horizontal AI frameworks.</div>
+      <div class="cv-body">These laws and standards apply across all verticals — establishing the baseline AI governance every regulated industry shares, on top of the vertical-specific provisions above.</div>
+      <div class="cv-grid">
+        <div class="cv-item eu">
+          <strong>EU AI Act</strong>
+          <span>Horizontal AI law; Annex III enumerates the vertical-specific high-risk provisions. Effective Aug 2026.</span>
+        </div>
+        <div class="cv-item colorado">
+          <strong>Colorado AI Act</strong>
+          <span>Consequential decisions across finance, health, employment, insurance, education. Effective Feb 2026.</span>
+        </div>
+        <div class="cv-item nist">
+          <strong>NIST AI RMF</strong>
+          <span>US federal AI governance reference (AI 100-1), including the GenAI Profile (AI 600-1).</span>
+        </div>
+        <div class="cv-item iso">
+          <strong>ISO 42001</strong>
+          <span>International AI Management System standard (ISO/IEC 42001:2023).</span>
+        </div>
+        <div class="cv-item soc">
+          <strong>SOC 2 Type II</strong>
+          <span>Security and trust controls — enterprise procurement table stakes.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ——————————————————— DESIGN PARTNER ——————————————————— -->
+<section class="dark" id="design-partner">
+  <div class="container">
+    <div class="dp-block">
+      <div>
+        <span class="dp-spots">LIMITED COHORT · OPEN NOW</span>
+        <h2>Design partner program.</h2>
+        <p>Free for high-growth fintech, insurtech, and healthtech teams shipping AI agents into production. Co-develop a vertical compliance pack with the founding team.</p>
+        <p>Survive the EU AI Act (August 2026) and Colorado AI Act (June 2026) without a retrofit.</p>
+        <div class="criteria">
+          <strong>Selection criteria</strong>
+          Operating in a regulated vertical · Shipping agents that touch money, identity, or PII · Willing to commit a 30-minute weekly working session for 4 weeks.
+        </div>
+      </div>
+      <div class="dp-cta">
+        <a href="mailto:founders@permit0.com" class="btn btn-primary btn-lg">Apply to the program <span class="arrow">→</span></a>
+        <div style="margin-top: 14px;">
+          <a href="mailto:founders@permit0.com" class="link-cyan">Or email founders@permit0.com</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ——————————————————— RESOURCES ——————————————————— -->
+<section class="light" id="resources">
+  <div class="container">
+    <div class="section-head">
+      <div class="eyebrow">Resources</div>
+      <h2>The references behind the engine.</h2>
+      <p>Everything Permit0 enforces is documented, versioned, and verifiable.</p>
+    </div>
+
+    <div class="resource-grid">
+      <a href="#" class="resource">
+        <div class="r-type">Specification</div>
+        <h4>Permit0 Taxonomy v1</h4>
+        <p>The complete public specification of canonical actions, risk flags, and amplifiers.</p>
+        <span class="r-link">Read the spec <span class="arrow">→</span></span>
+      </a>
+      <a href="#" class="resource">
+        <div class="r-type">Whitepaper</div>
+        <h4>Architecture overview</h4>
+        <p>How the engine, capability tokens, and policy distribution work end-to-end.</p>
+        <span class="r-link">Read the paper <span class="arrow">→</span></span>
+      </a>
+      <a href="#" class="resource">
+        <div class="r-type">Compliance brief</div>
+        <h4>EU AI Act mapping</h4>
+        <p>Article 9, 12, and 14 mapped to default policies across actions — with sample evidence formats.</p>
+        <span class="r-link">Download the brief <span class="arrow">→</span></span>
+      </a>
+      <a href="https://github.com/permit0-ai" class="resource">
+        <div class="r-type">Repository</div>
+        <h4>permit0 on GitHub</h4>
+        <p>Open source SDK, action packs, and the self-hosted policy engine. Apache 2.0.</p>
+        <span class="r-link">View on GitHub <span class="arrow">→</span></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ——————————————————— FINAL CTA ——————————————————— -->
+<section class="final">
+  <div class="container">
+    <div class="final-inner">
+      <div class="terminal">
+        <span class="prompt">$</span>
+        <span>pip install permit0</span>
+        <span class="cursor"></span>
+      </div>
+      <h2>Action authorization for AI agents.</h2>
+      <p>Open source. Production-grade. Ready for the regulated verticals where post-hoc audit is no longer enough.</p>
+      <div class="final-cta">
+        <a href="#design-partner" class="btn btn-primary btn-lg">Talk to founders <span class="arrow">→</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ——————————————————— FOOTER ——————————————————— -->
+<footer class="dark">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a href="#" class="wordmark" style="color: var(--text-light);">
+        <span class="logo-mark">
+          <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+            <path d="M 24 14 L 14 14 L 14 50 L 24 50 M 40 14 L 50 14 L 50 50 L 40 50"
+                  stroke="#22d3ee" stroke-width="9" fill="none"
+                  stroke-linecap="square" stroke-linejoin="miter"/>
+            <circle cx="32" cy="32" r="6" fill="#22d3ee"/>
+          </svg>
+        </span>
+        permit0
+      </a>
+      <p>Action authorization for AI agents. Built by engineers who shipped governance at Google Cloud and Salesforce.</p>
+    </div>
+
+    <div class="footer-col">
+      <h5>Product</h5>
+      <ul>
+        <li><a href="#platform">Engine</a></li>
+        <li><a href="#platform">Taxonomy</a></li>
+        <li><a href="#platform">Compliance Center</a></li>
+        <li><a href="#">Deployment modes</a></li>
+        <li><a href="#">Pricing</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h5>Solutions</h5>
+      <ul>
+        <li><a href="#verticals">Fintech</a></li>
+        <li><a href="#verticals">Collections</a></li>
+        <li><a href="#verticals">Insurance</a></li>
+        <li><a href="#verticals">Legal</a></li>
+        <li><a href="#verticals">Healthcare</a></li>
+        <li><a href="#verticals">HR &amp; Employment</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h5>Resources</h5>
+      <ul>
+        <li><a href="#">Documentation</a></li>
+        <li><a href="#">Taxonomy v1</a></li>
+        <li><a href="#">Architecture</a></li>
+        <li><a href="https://github.com/permit0-ai">GitHub</a></li>
+        <li><a href="#">Compliance briefs</a></li>
+      </ul>
+    </div>
+
+    <div class="footer-col">
+      <h5>Company</h5>
+      <ul>
+        <li><a href="#">About</a></li>
+        <li><a href="#">Blog</a></li>
+        <li><a href="#">Careers</a></li>
+        <li><a href="#">Security</a></li>
+        <li><a href="mailto:founders@permit0.com">Contact</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="footer-bottom">
+    <div>permit0 · ©2026 · Seattle / Oxford</div>
+    <div class="footer-social">
+      <a href="https://github.com/permit0-ai">GitHub</a>
+      <a href="#">X / Twitter</a>
+      <a href="#">LinkedIn</a>
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
