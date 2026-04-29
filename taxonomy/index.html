@@ -211,6 +211,81 @@
     background: var(--cyan-deep);
   }
 
+  /* —————————————————————— LIVE NOTICE ——————————————————————— */
+  .live-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 16px 20px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-left: 3px solid var(--cyan-deep);
+    border-radius: 10px;
+    margin-bottom: 28px;
+    font-size: 14px;
+    color: var(--text-mute);
+    line-height: 1.55;
+  }
+  .live-notice strong { color: var(--text-dark); font-weight: 600; }
+  .live-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--lime-soft);
+    color: var(--lime-deep);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+  }
+  .live-pill::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--lime-deep);
+    box-shadow: 0 0 0 3px rgba(101, 163, 13, 0.18);
+  }
+  .reference-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    background: var(--bg-card-2);
+    color: var(--text-mute-2);
+    border: 1px solid var(--border-light);
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    flex-shrink: 0;
+  }
+
+  /* —————————————————————— DOMAIN GROUPS ——————————————————————— */
+  .group-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text-mute-2);
+    margin: 28px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .group-title:first-child { margin-top: 0; }
+  .group-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
   /* —————————————————————— RISK LEGEND ——————————————————————— */
   .risk-legend {
     display: flex;
@@ -671,12 +746,12 @@
     <p class="subtitle">Every agent action is normalized, scored, and routed through a deterministic risk pipeline. Here's what we detect, how we score it, and what happens when an attack chain unfolds.</p>
     <div class="stats-row">
       <div class="stat">
-        <div class="stat-number">20</div>
+        <div class="stat-number">20<span style="color:var(--text-mute-2); font-weight:500;">+1</span></div>
         <div class="stat-label">Domains</div>
       </div>
       <div class="stat">
-        <div class="stat-number">119</div>
-        <div class="stat-label">Actions</div>
+        <div class="stat-number">10</div>
+        <div class="stat-label">Groups</div>
       </div>
       <div class="stat">
         <div class="stat-number">9</div>
@@ -685,10 +760,6 @@
       <div class="stat">
         <div class="stat-number">5</div>
         <div class="stat-label">Tiers</div>
-      </div>
-      <div class="stat">
-        <div class="stat-number critical-num">7</div>
-        <div class="stat-label">Block Rules</div>
       </div>
     </div>
   </div>
@@ -705,7 +776,15 @@
   <!-- SECTION 0: DOMAINS & ACTIONS                -->
   <!-- ============================================ -->
   <div class="section-title">All Domains</div>
-  <div class="threat-grid" id="domains"></div>
+
+  <div class="live-notice">
+    <span class="live-pill">Live</span>
+    <div>
+      Today, only <strong>Email</strong> domain actions are live. The rest of this taxonomy is published as our reference taxonomy &mdash; implementation will follow, prioritized by demand.
+    </div>
+  </div>
+
+  <div id="domains"></div>
 
   <!-- ============================================ -->
   <!-- SECTION 1: RISK FLAGS & AMPLIFIERS          -->
@@ -1160,235 +1239,287 @@
 </div>
 
 <script>
-// Domains & Actions
+// Domains & Actions (20 + 1, organized into 10 groups)
 const domains = [
-  {
-    name: "email", icon: "\u2709\ufe0f", actions: [
-      { name: "search", risk: "low", policy: "Allow \u2014 rate limited" },
-      { name: "get_thread", risk: "low", policy: "Allow \u2014 rate limited" },
-      { name: "send", risk: "high", policy: "Approval required \u2014 external domain allowlist, max recipients" },
-      { name: "reply", risk: "high", policy: "Approval required \u2014 external domain allowlist" },
-      { name: "forward", risk: "high", policy: "Approval required \u2014 external domain allowlist" },
-      { name: "draft", risk: "low", policy: "Allow" },
-      { name: "label", risk: "low", policy: "Allow \u2014 label allowlist" },
-      { name: "archive", risk: "low", policy: "Allow \u2014 max count" },
-      { name: "delete", risk: "high", policy: "Approval required \u2014 max count = 5" }
-    ]
-  },
-  {
-    name: "messages", icon: "\ud83d\udcac", actions: [
-      { name: "send", risk: "medium", policy: "Allow internal \u2014 channel allowlist" },
-      { name: "post_channel", risk: "medium", policy: "Allow internal \u2014 channel allowlist" },
-      { name: "send_dm", risk: "medium", policy: "Allow internal" },
-      { name: "search", risk: "low", policy: "Allow" },
-      { name: "react", risk: "low", policy: "Allow" },
-      { name: "delete", risk: "high", policy: "Approval required" }
-    ]
-  },
-  {
-    name: "content", icon: "\ud83d\udce2", actions: [
-      { name: "post_social", risk: "high", policy: "Approval required \u2014 platform allowlist" },
-      { name: "update_cms", risk: "high", policy: "Approval required" },
-      { name: "send_newsletter", risk: "critical", policy: "Approval required \u2014 max recipients" }
-    ]
-  },
-  {
-    name: "calendar", icon: "\ud83d\udcc5", actions: [
-      { name: "list_events", risk: "low", policy: "Allow" },
-      { name: "get_event", risk: "low", policy: "Allow" },
-      { name: "create_event", risk: "low", policy: "Allow" },
-      { name: "update_event", risk: "medium", policy: "Allow \u2014 constraints on attendees" },
-      { name: "delete_event", risk: "medium", policy: "Approval required" },
-      { name: "rsvp", risk: "low", policy: "Allow" }
-    ]
-  },
-  {
-    name: "tasks", icon: "\u2705", actions: [
-      { name: "create", risk: "low", policy: "Allow" },
-      { name: "assign", risk: "low", policy: "Allow" },
-      { name: "complete", risk: "low", policy: "Allow" },
-      { name: "update", risk: "low", policy: "Allow" },
-      { name: "delete", risk: "medium", policy: "Approval required" },
-      { name: "comment", risk: "low", policy: "Allow" }
-    ]
-  },
-  {
-    name: "files", icon: "\ud83d\udcc1", actions: [
-      { name: "list", risk: "low", policy: "Allow" },
-      { name: "read", risk: "low", policy: "Allow" },
-      { name: "write", risk: "medium", policy: "Allow \u2014 path allowlist" },
-      { name: "delete", risk: "high", policy: "Approval required \u2014 shared resources blocked" },
-      { name: "move", risk: "medium", policy: "Allow" },
-      { name: "copy", risk: "medium", policy: "Allow" },
-      { name: "share", risk: "high", policy: "Approval required \u2014 external share blocked" },
-      { name: "upload", risk: "medium", policy: "Allow \u2014 size limit" },
-      { name: "download", risk: "medium", policy: "Allow \u2014 rate limited" },
-      { name: "export", risk: "high", policy: "Approval required \u2014 external blocked" }
-    ]
-  },
-  {
-    name: "db", icon: "\ud83d\uddc4\ufe0f", actions: [
-      { name: "select", risk: "low", policy: "Allow \u2014 rate limited" },
-      { name: "insert", risk: "medium", policy: "Allow" },
-      { name: "update", risk: "medium", policy: "Allow \u2014 scope limited" },
-      { name: "delete", risk: "high", policy: "Approval required" },
-      { name: "admin", risk: "critical", policy: "Approval required" },
-      { name: "export", risk: "high", policy: "Approval required \u2014 external blocked" },
-      { name: "backup", risk: "medium", policy: "Allow" }
-    ]
-  },
-  {
-    name: "crm", icon: "\ud83e\udd1d", actions: [
-      { name: "search_contacts", risk: "low", policy: "Allow" },
-      { name: "get_contact", risk: "low", policy: "Allow" },
-      { name: "create_contact", risk: "low", policy: "Allow" },
-      { name: "update_contact", risk: "medium", policy: "Allow" },
-      { name: "delete_contact", risk: "high", policy: "Approval required" },
-      { name: "create_deal", risk: "medium", policy: "Allow" },
-      { name: "update_deal", risk: "medium", policy: "Allow" },
-      { name: "log_activity", risk: "low", policy: "Allow" },
-      { name: "export", risk: "high", policy: "Approval required \u2014 external blocked" }
-    ]
-  },
-  {
-    name: "payments", icon: "\ud83d\udcb3", actions: [
-      { name: "charge", risk: "critical", policy: "Approval required \u2014 amount threshold" },
-      { name: "refund", risk: "high", policy: "Approval required \u2014 amount > $1K" },
-      { name: "transfer", risk: "critical", policy: "Approval required \u2014 amount > $1K" },
-      { name: "get_balance", risk: "low", policy: "Allow" },
-      { name: "list_transactions", risk: "low", policy: "Allow" },
-      { name: "create_invoice", risk: "medium", policy: "Allow \u2014 amount threshold" },
-      { name: "update_payment_method", risk: "high", policy: "Approval required" },
-      { name: "create_subscription", risk: "high", policy: "Approval required" }
-    ]
-  },
-  {
-    name: "legal", icon: "\u2696\ufe0f", actions: [
-      { name: "sign_document", risk: "critical", policy: "Dual approval required" },
-      { name: "submit_filing", risk: "critical", policy: "Denied by default \u2014 dual approval" },
-      { name: "accept_terms", risk: "critical", policy: "Approval required" }
-    ]
-  },
-  {
-    name: "iam", icon: "\ud83d\udd10", actions: [
-      { name: "list_users", risk: "low", policy: "Allow" },
-      { name: "create_user", risk: "high", policy: "Approval required" },
-      { name: "update_user", risk: "high", policy: "Approval required" },
-      { name: "delete_user", risk: "critical", policy: "Approval required" },
-      { name: "assign_role", risk: "high", policy: "Approval required" },
-      { name: "revoke_role", risk: "high", policy: "Approval required" },
-      { name: "reset_password", risk: "high", policy: "Approval required" },
-      { name: "generate_api_key", risk: "critical", policy: "Approval required" }
-    ]
-  },
-  {
-    name: "secrets", icon: "\ud83d\udd11", actions: [
-      { name: "read", risk: "critical", policy: "Approval required \u2014 JIT access only" },
-      { name: "create", risk: "high", policy: "Approval required" },
-      { name: "rotate", risk: "critical", policy: "Approval required" }
-    ]
-  },
-  {
-    name: "infra", icon: "\ud83c\udfd7\ufe0f", actions: [
-      { name: "list_resources", risk: "low", policy: "Allow" },
-      { name: "create_resource", risk: "high", policy: "Approval required" },
-      { name: "modify_resource", risk: "high", policy: "Approval required" },
-      { name: "terminate_resource", risk: "critical", policy: "Approval required" },
-      { name: "scale", risk: "high", policy: "Allow \u2014 policy-bound limits" },
-      { name: "modify_network", risk: "critical", policy: "Approval required" }
-    ]
-  },
-  {
-    name: "process", icon: "\u2699\ufe0f", actions: [
-      { name: "shell", risk: "high", policy: "Approval required" },
-      { name: "run_script", risk: "high", policy: "Approval required" },
-      { name: "docker_run", risk: "high", policy: "Approval required" },
-      { name: "lambda_invoke", risk: "high", policy: "Approval required" }
-    ]
-  },
-  {
-    name: "network", icon: "\ud83c\udf10", actions: [
-      { name: "http_get", risk: "low", policy: "Allow \u2014 rate limited" },
-      { name: "http_post", risk: "medium", policy: "Allow \u2014 domain allowlist" },
-      { name: "webhook_send", risk: "medium", policy: "Allow \u2014 endpoint allowlist" }
-    ]
-  },
-  {
-    name: "dev", icon: "\ud83d\udee0\ufe0f", actions: [
-      { name: "get_repo", risk: "low", policy: "Allow" },
-      { name: "list_issues", risk: "low", policy: "Allow" },
-      { name: "create_issue", risk: "low", policy: "Allow" },
-      { name: "create_pr", risk: "medium", policy: "Allow" },
-      { name: "merge_pr", risk: "high", policy: "Approval required" },
-      { name: "push_code", risk: "high", policy: "Approval required \u2014 branch protection" },
-      { name: "deploy", risk: "high", policy: "Approval required" },
-      { name: "run_pipeline", risk: "high", policy: "Approval required" },
-      { name: "create_release", risk: "high", policy: "Approval required" }
-    ]
-  },
-  {
-    name: "browser", icon: "\ud83d\udda5\ufe0f", actions: [
-      { name: "navigate", risk: "low", policy: "Allow \u2014 domain allowlist" },
-      { name: "click", risk: "medium", policy: "Allow" },
-      { name: "fill_form", risk: "medium", policy: "Allow \u2014 field restrictions" },
-      { name: "submit_form", risk: "high", policy: "Approval required" },
-      { name: "screenshot", risk: "medium", policy: "Allow" },
-      { name: "download", risk: "high", policy: "Approval required" },
-      { name: "execute_js", risk: "high", policy: "Approval required" }
-    ]
-  },
-  {
-    name: "device", icon: "\ud83d\udcf1", actions: [
-      { name: "unlock", risk: "high", policy: "Approval required" },
-      { name: "lock", risk: "low", policy: "Allow" },
-      { name: "camera_enable", risk: "high", policy: "Approval required" },
-      { name: "camera_disable", risk: "low", policy: "Allow" },
-      { name: "move", risk: "high", policy: "Approval required" }
-    ]
-  },
-  {
-    name: "ai", icon: "\ud83e\udd16", actions: [
-      { name: "prompt", risk: "medium", policy: "Allow \u2014 rate limited" },
-      { name: "embed", risk: "low", policy: "Allow" },
-      { name: "fine_tune", risk: "high", policy: "Approval required" }
-    ]
-  },
-  {
-    name: "unknown", icon: "\u2753", actions: [
-      { name: "unclassified", risk: "high", policy: "Default: approval required \u2014 never auto-allows unknown actions" }
-    ]
-  }
+  // Communication
+  { name: "email", icon: "\u2709\ufe0f", group: "Communication", live: true, blurb: "Regulated transport, retention-bound", actions: [
+    { name: "search", risk: "low" },
+    { name: "read", risk: "low" },
+    { name: "read_thread", risk: "low" },
+    { name: "list_mailboxes", risk: "low" },
+    { name: "draft", risk: "low" },
+    { name: "send", risk: "high" },
+    { name: "mark_read", risk: "low" },
+    { name: "flag", risk: "low" },
+    { name: "move", risk: "low" },
+    { name: "archive", risk: "low" },
+    { name: "mark_spam", risk: "low" },
+    { name: "delete", risk: "high" },
+    { name: "create_mailbox", risk: "medium" }
+  ]},
+  { name: "message", icon: "\ud83d\udcac", group: "Communication", blurb: "Chat platforms (Slack / Discord / Teams / SMS)", actions: [
+    { name: "post_channel", risk: "medium" },
+    { name: "send_dm", risk: "medium" },
+    { name: "send_sms", risk: "high" },
+    { name: "search", risk: "low" },
+    { name: "get", risk: "low" },
+    { name: "react", risk: "low" },
+    { name: "delete", risk: "high" },
+    { name: "update", risk: "medium" }
+  ]},
+  { name: "social", icon: "\ud83d\udce2", group: "Communication", blurb: "Public posting (Twitter / LinkedIn / Facebook / Mastodon)", actions: [
+    { name: "post", risk: "high" },
+    { name: "reply", risk: "high" },
+    { name: "delete", risk: "high" },
+    { name: "like", risk: "low" },
+    { name: "send_dm", risk: "medium" },
+    { name: "search", risk: "low" }
+  ]},
+  { name: "cms", icon: "\ud83d\udcdd", group: "Communication", blurb: "Content management (WordPress / Webflow / Contentful)", actions: [
+    { name: "publish", risk: "high" },
+    { name: "update", risk: "medium" },
+    { name: "unpublish", risk: "medium" },
+    { name: "schedule", risk: "medium" },
+    { name: "delete", risk: "high" },
+    { name: "list", risk: "low" }
+  ]},
+  { name: "newsletter", icon: "\ud83d\udce8", group: "Communication", blurb: "Bulk email (Mailchimp / Substack / SendGrid Marketing)", actions: [
+    { name: "send", risk: "critical" },
+    { name: "schedule", risk: "high" },
+    { name: "draft", risk: "low" },
+    { name: "update_segment", risk: "medium" },
+    { name: "unsubscribe", risk: "medium" }
+  ]},
+
+  // Productivity
+  { name: "calendar", icon: "\ud83d\udcc5", group: "Productivity", blurb: "Scheduling", actions: [
+    { name: "list_events", risk: "low" },
+    { name: "get_event", risk: "low" },
+    { name: "create_event", risk: "low" },
+    { name: "update_event", risk: "medium" },
+    { name: "delete_event", risk: "medium" },
+    { name: "rsvp", risk: "low" },
+    { name: "list_calendars", risk: "low" }
+  ]},
+  { name: "task", icon: "\u2705", group: "Productivity", blurb: "Work items (Linear / Jira / Asana / Notion)", actions: [
+    { name: "create", risk: "low" },
+    { name: "update", risk: "low" },
+    { name: "complete", risk: "low" },
+    { name: "assign", risk: "low" },
+    { name: "delete", risk: "medium" },
+    { name: "comment", risk: "low" },
+    { name: "list", risk: "low" },
+    { name: "get", risk: "low" }
+  ]},
+  { name: "file", icon: "\ud83d\udcc1", group: "Productivity", blurb: "Filesystem + cloud storage + docs (Drive / Dropbox / S3 / local)", actions: [
+    { name: "list", risk: "low" },
+    { name: "get", risk: "low" },
+    { name: "read", risk: "low" },
+    { name: "create", risk: "medium" },
+    { name: "update", risk: "medium" },
+    { name: "delete", risk: "high" },
+    { name: "move", risk: "medium" },
+    { name: "copy", risk: "medium" },
+    { name: "share", risk: "high" },
+    { name: "upload", risk: "medium" },
+    { name: "download", risk: "medium" },
+    { name: "export", risk: "high" },
+    { name: "search", risk: "low" }
+  ]},
+
+  // Data
+  { name: "db", icon: "\ud83d\uddc4\ufe0f", group: "Data", blurb: "Database operations", actions: [
+    { name: "select", risk: "low" },
+    { name: "insert", risk: "medium" },
+    { name: "update", risk: "medium" },
+    { name: "delete", risk: "high" },
+    { name: "export", risk: "high" },
+    { name: "backup", risk: "medium" },
+    { name: "alter_schema", risk: "critical" },
+    { name: "grant_access", risk: "critical" },
+    { name: "revoke_access", risk: "high" }
+  ]},
+  { name: "crm", icon: "\ud83e\udd1d", group: "Data", blurb: "Customer data (Salesforce / HubSpot / Pipedrive)", actions: [
+    { name: "list_contacts", risk: "low" },
+    { name: "get_contact", risk: "low" },
+    { name: "search_contacts", risk: "low" },
+    { name: "create_contact", risk: "low" },
+    { name: "update_contact", risk: "medium" },
+    { name: "delete_contact", risk: "high" },
+    { name: "create_deal", risk: "medium" },
+    { name: "update_deal", risk: "medium" },
+    { name: "delete_deal", risk: "high" },
+    { name: "log_activity", risk: "low" },
+    { name: "export", risk: "high" }
+  ]},
+
+  // Money
+  { name: "payment", icon: "\ud83d\udcb3", group: "Money", blurb: "Money movement", actions: [
+    { name: "charge", risk: "critical" },
+    { name: "refund", risk: "high" },
+    { name: "transfer", risk: "critical" },
+    { name: "get_balance", risk: "low" },
+    { name: "list_transactions", risk: "low" },
+    { name: "create_invoice", risk: "medium" },
+    { name: "update_method", risk: "high" },
+    { name: "create_subscription", risk: "high" },
+    { name: "cancel_subscription", risk: "high" }
+  ]},
+
+  // Compliance
+  { name: "legal", icon: "\u2696\ufe0f", group: "Compliance", blurb: "Binding actions \u2014 always REQUIRE_APPROVAL by default", actions: [
+    { name: "sign_document", risk: "critical" },
+    { name: "submit_filing", risk: "critical" },
+    { name: "accept_terms", risk: "critical" }
+  ]},
+
+  // Identity & Security
+  { name: "iam", icon: "\ud83d\udd10", group: "Identity & Security", blurb: "Identity & access", actions: [
+    { name: "list_users", risk: "low" },
+    { name: "get_user", risk: "low" },
+    { name: "create_user", risk: "high" },
+    { name: "update_user", risk: "high" },
+    { name: "delete_user", risk: "critical" },
+    { name: "assign_role", risk: "high" },
+    { name: "revoke_role", risk: "high" },
+    { name: "reset_password", risk: "high" },
+    { name: "generate_api_key", risk: "critical" },
+    { name: "revoke_api_key", risk: "high" }
+  ]},
+  { name: "secret", icon: "\ud83d\udd11", group: "Identity & Security", blurb: "Credential storage", actions: [
+    { name: "get", risk: "critical" },
+    { name: "list", risk: "medium" },
+    { name: "create", risk: "high" },
+    { name: "update", risk: "high" },
+    { name: "rotate", risk: "critical" },
+    { name: "delete", risk: "critical" }
+  ]},
+
+  // Infra & Execution
+  { name: "infra", icon: "\ud83c\udfd7\ufe0f", group: "Infra & Execution", blurb: "Cloud / compute resources", actions: [
+    { name: "list_resources", risk: "low" },
+    { name: "get_resource", risk: "low" },
+    { name: "create_resource", risk: "high" },
+    { name: "update_resource", risk: "high" },
+    { name: "terminate_resource", risk: "critical" },
+    { name: "scale", risk: "high" },
+    { name: "update_network", risk: "critical" },
+    { name: "update_security_group", risk: "critical" }
+  ]},
+  { name: "process", icon: "\u2699\ufe0f", group: "Infra & Execution", blurb: "Code execution", actions: [
+    { name: "run_shell", risk: "high" },
+    { name: "run_script", risk: "high" },
+    { name: "run_container", risk: "high" },
+    { name: "invoke_function", risk: "high" }
+  ]},
+  { name: "network", icon: "\ud83c\udf10", group: "Infra & Execution", blurb: "Outbound network calls", actions: [
+    { name: "get", risk: "low" },
+    { name: "post", risk: "medium" },
+    { name: "put", risk: "medium" },
+    { name: "delete", risk: "high" },
+    { name: "send_webhook", risk: "medium" }
+  ]},
+
+  // Development
+  { name: "dev", icon: "\ud83d\udee0\ufe0f", group: "Development", blurb: "Code repository operations (GitHub / GitLab / Bitbucket)", actions: [
+    { name: "list_repos", risk: "low" },
+    { name: "get_repo", risk: "low" },
+    { name: "list_issues", risk: "low" },
+    { name: "get_issue", risk: "low" },
+    { name: "create_issue", risk: "low" },
+    { name: "update_issue", risk: "low" },
+    { name: "close_issue", risk: "low" },
+    { name: "list_prs", risk: "low" },
+    { name: "get_pr", risk: "low" },
+    { name: "create_pr", risk: "medium" },
+    { name: "merge_pr", risk: "high" },
+    { name: "push_code", risk: "high" },
+    { name: "deploy", risk: "high" },
+    { name: "run_pipeline", risk: "high" },
+    { name: "create_release", risk: "high" }
+  ]},
+
+  // Agent Surfaces
+  { name: "browser", icon: "\ud83d\udda5\ufe0f", group: "Agent Surfaces", blurb: "Web automation", actions: [
+    { name: "navigate", risk: "low" },
+    { name: "click", risk: "medium" },
+    { name: "fill_form", risk: "medium" },
+    { name: "submit_form", risk: "high" },
+    { name: "take_screenshot", risk: "medium" },
+    { name: "download_file", risk: "high" },
+    { name: "execute_js", risk: "critical" },
+    { name: "scrape", risk: "medium" }
+  ]},
+  { name: "device", icon: "\ud83d\udcf1", group: "Agent Surfaces", blurb: "Physical device control", actions: [
+    { name: "lock", risk: "low" },
+    { name: "unlock", risk: "high" },
+    { name: "enable_camera", risk: "high" },
+    { name: "disable_camera", risk: "low" },
+    { name: "move_robot", risk: "high" }
+  ]},
+  { name: "ai", icon: "\ud83e\udd16", group: "Agent Surfaces", blurb: "Model invocations", actions: [
+    { name: "prompt", risk: "medium" },
+    { name: "embed", risk: "low" },
+    { name: "fine_tune", risk: "high" },
+    { name: "invoke_agent", risk: "high" },
+    { name: "generate_image", risk: "medium" }
+  ]},
+
+  // Fallback
+  { name: "unknown", icon: "\u2753", group: "Fallback", blurb: "Compiler couldn\u2019t normalize \u2014 emits this so policy can still gate", actions: [
+    { name: "unclassified", risk: "high" }
+  ]}
 ];
 
-function getRiskDots(actions) {
-  const risks = new Set(actions.map(a => a.risk));
-  const order = ['critical', 'high', 'medium', 'low'];
-  return order.filter(r => risks.has(r)).map(r =>
-    `<div class="mini-badge" style="background:var(--${r})"></div>`
-  ).join('');
-}
+const groupOrder = [
+  "Communication",
+  "Productivity",
+  "Data",
+  "Money",
+  "Compliance",
+  "Identity & Security",
+  "Infra & Execution",
+  "Development",
+  "Agent Surfaces",
+  "Fallback"
+];
 
-document.getElementById('domains').innerHTML = domains.map(d => `
-  <div class="card" data-attr="domain-card-${d.name}" onclick="this.classList.toggle('open')">
-    <div class="card-header">
-      <div class="card-left">
-        <div class="card-icon" style="background:var(--accent-dim);">${d.icon}</div>
-        <div>
-          <div class="card-name">${d.name}</div>
-          <div class="card-count">${d.actions.length} action${d.actions.length > 1 ? 's' : ''}</div>
+function renderDomainCard(d) {
+  const statusPill = d.live
+    ? `<span class="live-pill">Live</span>`
+    : `<span class="reference-pill">Reference</span>`;
+  return `
+    <div class="card" data-attr="domain-card-${d.name}" onclick="this.classList.toggle('open')">
+      <div class="card-header">
+        <div class="card-left">
+          <div class="card-icon" style="background:var(--accent-dim);">${d.icon}</div>
+          <div>
+            <div class="card-name">${d.name}.*</div>
+            <div class="card-count">${d.blurb}</div>
+          </div>
+        </div>
+        <div class="card-right">
+          ${statusPill}
+          <span class="chevron">&#9660;</span>
         </div>
       </div>
-      <div class="card-right">
-        <span class="chevron">&#9660;</span>
+      <div class="card-body">
+        <div style="display:flex; flex-wrap:wrap; gap:6px;">
+          ${d.actions.map(a => `<span style="font-family:var(--mono); font-size:12px; color:var(--accent); background:var(--accent-dim); padding:3px 10px; border-radius:4px;" title="risk: ${a.risk}">${d.name}.${a.name}</span>`).join('')}
+        </div>
       </div>
     </div>
-    <div class="card-body">
-      <div style="display:flex; flex-wrap:wrap; gap:6px;">
-        ${d.actions.map(a => `<span style="font-family:var(--mono); font-size:12px; color:var(--accent); background:var(--accent-dim); padding:3px 10px; border-radius:4px;">${d.name}.${a.name}</span>`).join('')}
-      </div>
-    </div>
-  </div>
-`).join('');
+  `;
+}
+
+document.getElementById('domains').innerHTML = groupOrder.map(g => {
+  const cards = domains.filter(d => d.group === g).map(renderDomainCard).join('');
+  if (!cards) return '';
+  return `
+    <div class="group-title">${g}</div>
+    <div class="group-cards">${cards}</div>
+  `;
+}).join('');
 
 // Risk Flags
 const riskFlags = [

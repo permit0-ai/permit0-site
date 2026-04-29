@@ -389,9 +389,18 @@
     line-height: 1.7;
   }
   .code-output .blocked { color: var(--block); font-weight: 600; }
+  .code-output .allowed { color: var(--allow); font-weight: 600; }
   .code-output .warn-t  { color: var(--warn); font-weight: 500; }
   .code-output .label   { color: var(--text-light-dim); }
   .code-output .val     { color: #d6e0ee; }
+  .code-output .row     { display: flex; gap: 16px; align-items: baseline; }
+  .code-output .row + .row { margin-top: 4px; }
+  .code-output .indent  { padding-left: 20px; color: var(--text-light-dim); font-size: 12px; }
+  .code-output hr.divider {
+    border: none;
+    border-top: 1px dashed var(--border-dark-2);
+    margin: 10px 0;
+  }
 
   /* Hero stats strip */
   .hero-stats {
@@ -399,7 +408,7 @@
     padding-top: 44px;
     border-top: 1px solid var(--border-dark);
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 28px;
   }
   .hero-stat .num {
@@ -795,7 +804,7 @@
   /* —————————————————————— STATS ——————————————————————— */
   .stat-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 0;
     border: 1px solid var(--border-light);
     border-radius: 10px;
@@ -1341,7 +1350,7 @@
           for AI agents.
         </h1>
         <p class="hero-sub fade-in d3">
-          Permit0 is the action authorization layer for AI agents — the deterministic policy enforcement between what an agent decides and what it executes. We provide a canonical taxonomy of agent actions across 20 domains, risk defaults, and compliance mappings. Built for engineering teams shipping agents into production with trust.
+          Permit0 is the action authorization layer for AI agents — the deterministic policy enforcement between what an agent decides and what it executes. We provide a canonical taxonomy of agent actions across 21 domains, risk defaults, and compliance mappings. Built for engineering teams shipping agents into production with trust.
         </p>
         <div class="hero-cta fade-in d4">
           <a href="https://calendly.com/sfu-permit0" target="_blank" rel="noopener" class="btn btn-primary btn-lg" data-attr="cta-hero-talk-to-founders">Talk to founders <span class="arrow">→</span></a>
@@ -1357,24 +1366,28 @@
             <span>support_agent.py</span>
           </div>
           <div class="code-body">
-<pre><span class="kw">from</span> <span class="var">permit0</span> <span class="kw">import</span> <span class="var">guard</span>, <span class="var">permit</span>
+<pre><span class="kw">import</span> <span class="var">permit0</span>
+<span class="kw">import</span> <span class="var">stripe</span>
 
-<span class="dec">@guard</span>
-<span class="kw">def</span> <span class="fn">refund_customer</span>(<span class="var">charge_id</span>, <span class="var">amount</span>):
-    <span class="var">permit</span>.<span class="fn">require</span>(<span class="str">"payments.refund"</span>, {
-        <span class="str">"amount"</span>: <span class="var">amount</span>,
-        <span class="str">"actor"</span>: <span class="str">"support_agent_v2"</span>,
-    })
-    <span class="kw">return</span> <span class="var">stripe</span>.<span class="var">Refund</span>.<span class="fn">create</span>(<span class="var">charge_id</span>)
+<span class="com"># One decorator. Permit0 scores every refund call.</span>
+<span class="dec">@permit0.guard</span>(<span class="str">"payments.refund"</span>)
+<span class="kw">def</span> <span class="fn">refund_customer</span>(<span class="var">charge_id</span>, <span class="var">amount_usd</span>):
+    <span class="kw">return</span> <span class="var">stripe</span>.<span class="var">Refund</span>.<span class="fn">create</span>(
+        <span class="var">charge</span>=<span class="var">charge_id</span>,
+        <span class="var">amount</span>=<span class="fn">int</span>(<span class="var">amount_usd</span> * <span class="num">100</span>),
+    )
 
-<span class="com"># agent fires this after a customer complaint</span>
-<span class="fn">refund_customer</span>(<span class="str">"ch_3O9k..."</span>, <span class="var">amount</span>=<span class="num">85000</span>)</pre>
+<span class="com"># AI support agent resolves two customer complaints…</span>
+<span class="fn">refund_customer</span>(<span class="str">"ch_3a2k9..."</span>, <span class="var">amount_usd</span>=<span class="num">25</span>)      <span class="com"># routine</span>
+<span class="fn">refund_customer</span>(<span class="str">"ch_3b8m1..."</span>, <span class="var">amount_usd</span>=<span class="num">8500</span>)    <span class="com"># 340× larger</span></pre>
           </div>
           <div class="code-output">
-            <div><span class="blocked">✗ BLOCKED</span> &nbsp;<span class="label">action=</span><span class="val">payments.refund</span></div>
-            <div><span class="label">risk:</span> <span class="val">82/100</span> &nbsp;<span class="label">flags:</span> <span class="val">FINANCIAL · MUTATION</span></div>
-            <div><span class="label">reason:</span> <span class="val">amount &gt; $1,000 requires human approval</span></div>
-            <div><span class="label">escalated:</span> <span class="warn-t">→ human_review</span></div>
+            <div class="row"><span class="allowed">✓ ALLOWED</span> <span class="val">payments.refund</span> <span class="label">$25</span> <span class="warn-t" style="color:var(--text-light-dim);">→ processed by Stripe</span></div>
+            <hr class="divider">
+            <div class="row"><span class="blocked">✗ BLOCKED</span> <span class="val">payments.refund</span> <span class="label">$8,500</span></div>
+            <div class="indent"><span class="label">risk:</span> <span class="val">82/100</span> &nbsp;<span class="label">tier:</span> <span class="val">HIGH</span> &nbsp;<span class="label">flags:</span> <span class="val">FINANCIAL · MUTATION</span></div>
+            <div class="indent"><span class="label">reason:</span> <span class="val">amount &gt; $1,000 requires human approval</span></div>
+            <div class="indent"><span class="label">escalated:</span> <span class="warn-t">→ human_review</span></div>
           </div>
         </div>
       </div>
@@ -1383,20 +1396,12 @@
     <!-- Hero stats -->
     <div class="hero-stats fade-in d5">
       <div class="hero-stat">
-        <div class="num">119</div>
-        <div class="lab">Canonical actions</div>
-      </div>
-      <div class="hero-stat">
-        <div class="num">20</div>
+        <div class="num">21</div>
         <div class="lab">Action domains</div>
       </div>
       <div class="hero-stat">
         <div class="num">9 <span class="unit">×</span> 10</div>
         <div class="lab">Risk dims (flags × amplifiers)</div>
-      </div>
-      <div class="hero-stat">
-        <div class="num">&lt;5<span class="unit">ms</span></div>
-        <div class="lab">p99 enforcement</div>
       </div>
       <div class="hero-stat">
         <div class="num">3</div>
@@ -1507,7 +1512,7 @@
         <p>Stop writing permission checks inside agent code. Full risk taxonomy and production-grade defaults — <span class="mono" style="color:var(--midnight); font-weight:500;">pip install</span>, ship.</p>
         <ul class="role-bullets">
           <li>5-minute integration with LangChain, MCP, CrewAI, OpenClaw, and raw Python tools</li>
-          <li>119 default actions across 20 domains, with risk policies on day one</li>
+          <li>Default actions across 21 domains, with risk policies on day one</li>
           <li>Free forever for OSS — full SDK, no rate limits</li>
         </ul>
         <a href="https://github.com/permit0-ai/permit0-core" target="_blank" rel="noopener" class="link-cyan" data-attr="cta-quickstart">Get started in 5 minutes <span class="arrow">→</span></a>
@@ -1615,7 +1620,7 @@
           </svg>
         </div>
         <h3>Permit0 Taxonomy</h3>
-        <p>A canonical taxonomy of 119 agent actions across 20 domains — each scored across 9 risk dimensions with opinionated defaults. Open, versioned, citable. The vocabulary your auditor can verify against and the substrate every Permit0 deployment runs on. Ship a policy-guarded agent in days, not quarters.</p>
+        <p>A canonical taxonomy of agent actions across 21 domains — each scored across 9 risk dimensions with opinionated defaults. Open, versioned, citable. The vocabulary your auditor can verify against and the substrate every Permit0 deployment runs on. Ship a policy-guarded agent in days, not quarters.</p>
         <a href="/taxonomy/" class="link-cyan" data-attr="cta-taxonomy-spec">Read the spec <span class="arrow">→</span></a>
       </div>
 
@@ -1647,17 +1652,9 @@
     </div>
 
     <div class="stat-grid">
-      <div class="stat-cell s-1">
-        <div class="num">119</div>
-        <div class="lab">Default canonical actions shipped</div>
-      </div>
       <div class="stat-cell s-2">
-        <div class="num">20</div>
+        <div class="num">21</div>
         <div class="lab">Action domains covered out of the box</div>
-      </div>
-      <div class="stat-cell s-3">
-        <div class="num">&lt;5<span class="unit">ms</span></div>
-        <div class="lab">p99 policy enforcement latency</div>
       </div>
       <div class="stat-cell s-4">
         <div class="num">9 <span class="unit">×</span> 10</div>
