@@ -411,6 +411,10 @@
     grid-template-columns: repeat(4, 1fr);
     gap: 28px;
   }
+  .hero-stat {
+    display: flex;
+    flex-direction: column;
+  }
   .hero-stat .num {
     font-size: 36px;
     font-weight: 600;
@@ -418,6 +422,7 @@
     color: var(--text-light);
     line-height: 1;
     margin-bottom: 10px;
+    min-height: 36px;
   }
   .hero-stat .num .unit {
     font-size: 22px;
@@ -432,6 +437,7 @@
     text-transform: uppercase;
     color: var(--text-light-dim);
     line-height: 1.4;
+    min-height: 2.8em;
   }
 
   /* —————————————————————— FRAMEWORK STRIP ——————————————————————— */
@@ -454,13 +460,14 @@
     align-items: center;
     justify-content: center;
     gap: 0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     color: var(--text-mute);
     font-weight: 500;
-    font-size: 16px;
+    font-size: 15px;
   }
   .fw-list span {
-    padding: 0 28px;
+    padding: 0 18px;
+    white-space: nowrap;
     transition: color 0.15s;
   }
   .fw-list span:hover { color: var(--midnight); }
@@ -1259,6 +1266,7 @@
     .stat-cell:last-child { border-right: none; border-bottom: none; }
     .resource-grid { grid-template-columns: repeat(2, 1fr); }
     .role-grid { grid-template-columns: 1fr; }
+    .fw-list { flex-wrap: wrap; row-gap: 12px; }
   }
   @media (max-width: 900px) {
     .pillar-grid, .platform-grid, .vertical-grid { grid-template-columns: 1fr; }
@@ -1401,7 +1409,7 @@
       </div>
       <div class="hero-stat">
         <div class="num">9 <span class="unit">×</span> 10</div>
-        <div class="lab">Risk dims (flags × amplifiers)</div>
+        <div class="lab">Risk flags × amplifiers</div>
       </div>
       <div class="hero-stat">
         <div class="num">3</div>
@@ -1434,7 +1442,7 @@
       <span class="sep"></span>
       <span>OpenAI Agents SDK</span>
       <span class="sep"></span>
-      <span>Claude Skills</span>
+      <span>Claude Code</span>
     </div>
   </div>
 </section>
