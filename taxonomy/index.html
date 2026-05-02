@@ -1248,6 +1248,7 @@ const domains = [
     { name: "read_thread", risk: "low" },
     { name: "list_mailboxes", risk: "low" },
     { name: "draft", risk: "low" },
+    { name: "list_drafts", risk: "low" },
     { name: "send", risk: "high" },
     { name: "mark_read", risk: "low" },
     { name: "flag", risk: "low" },
@@ -1255,7 +1256,9 @@ const domains = [
     { name: "archive", risk: "low" },
     { name: "mark_spam", risk: "low" },
     { name: "delete", risk: "high" },
-    { name: "create_mailbox", risk: "medium" }
+    { name: "create_mailbox", risk: "medium" },
+    { name: "set_forwarding", risk: "critical" },
+    { name: "add_delegate", risk: "critical" }
   ]},
   { name: "message", icon: "\ud83d\udcac", group: "Communication", blurb: "Chat platforms (Slack / Discord / Teams / SMS)", actions: [
     { name: "post_channel", risk: "medium" },
